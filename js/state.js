@@ -19,6 +19,9 @@ const state = {
   analogDigital: true,     // 模拟表盘风格下是否显示数字时间
   showSeconds: true,       // 是否显示秒数
   showAmpm: true,          // 是否显示 AM/PM（仅 12 小时制下生效）
+  showDate: true,          // 是否显示日期
+  showWeather: true,       // 是否显示天气
+  infoFontSize: 16,        // 日期/天气字号（px，范围 10-28）
   weatherSource: 'auto',   // 天气数据源：auto | amap | ecmwf | gfs | wttr
   globalZoom: 100,         // 全局缩放百分比（50-200，步进 10；CSS zoom 实现页面级整体缩放）
   analogScale: 100,        // 表盘尺寸缩放百分比（50-200，步进 5；仅 analog 风格，乘到 vh/vw 基础比例上）
@@ -47,6 +50,10 @@ function loadState() {
       if (typeof state.analogDigital !== 'boolean') state.analogDigital = true;
       if (typeof state.showSeconds !== 'boolean') state.showSeconds = true;
       if (typeof state.showAmpm !== 'boolean') state.showAmpm = true;
+      if (typeof state.showDate !== 'boolean') state.showDate = true;
+      if (typeof state.showWeather !== 'boolean') state.showWeather = true;
+      if (typeof state.infoFontSize !== 'number') state.infoFontSize = 16;
+      state.infoFontSize = Math.min(28, Math.max(10, Math.round(state.infoFontSize)));
       if (!['auto', 'amap', 'ecmwf', 'gfs', 'cma', 'wttr'].includes(state.weatherSource)) state.weatherSource = 'auto';
       if (typeof state.globalZoom !== 'number') state.globalZoom = 100;
       state.globalZoom = Math.min(200, Math.max(50, Math.round(state.globalZoom)));
@@ -77,6 +84,9 @@ function saveState() {
       analogDigital: state.analogDigital,
       showSeconds: state.showSeconds,
       showAmpm: state.showAmpm,
+      showDate: state.showDate,
+      showWeather: state.showWeather,
+      infoFontSize: state.infoFontSize,
       weatherSource: state.weatherSource,
       globalZoom: state.globalZoom,
       analogScale: state.analogScale,

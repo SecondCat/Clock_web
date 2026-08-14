@@ -39,7 +39,7 @@ const ALL_FONTS = [
 /* ---------- 三种风格的配置：默认字体/字号/字重、字号范围（字体列表统一用 ALL_FONTS） ---------- */
 const STYLE_CONFIGS = {
   minimal: {
-    label: '极简风',
+    label: '极简',
     defaultFont: "'Inter', 'PingFang SC', sans-serif",
     defaultSize: 92,
     defaultWeight: 200,
@@ -47,7 +47,7 @@ const STYLE_CONFIGS = {
     maxSize: 180,
   },
   neon: {
-    label: '霓虹风',
+    label: '霓虹',
     defaultFont: "'Orbitron', sans-serif",
     defaultSize: 84,
     defaultWeight: 700,
@@ -55,7 +55,7 @@ const STYLE_CONFIGS = {
     maxSize: 170,
   },
   analog: {
-    label: '模拟表盘',
+    label: '表盘',
     defaultFont: "'Cinzel', serif",
     defaultSize: 40,
     defaultWeight: 400,
@@ -120,7 +120,7 @@ const WWO_TO_WMO = {
    default 预设不写 CSS 规则，沿用 body 默认主题变量。 */
 const COLOR_PRESETS = {
   default: {
-    label: '星蓝（默认）',
+    label: '星蓝',
     themeColor: { light: '#f2f3f7', dark: '#0d0e16' },
   },
   ocean: {

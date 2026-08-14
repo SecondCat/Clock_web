@@ -46,14 +46,12 @@ function applyStyle(style, { persist = true } = {}) {
 }
 
 /** 将表盘尺寸缩放系数（state.analogScale，百分比）应用到 --analog-scale（数字 0.5-2），
-    并同步滑动条与数值显示（供 applyStyle 初始化与滑动条事件复用） */
+    并同步滑动条（供 applyStyle 初始化与滑动条事件复用） */
 function applyAnalogScale() {
   const scale = state.analogScale || 100;
   document.documentElement.style.setProperty('--analog-scale', String(scale / 100));
   const slider = $('#analog-scale-slider');
   if (slider) slider.value = String(scale);
-  const val = $('#analog-scale-value');
-  if (val) val.textContent = `${scale}%`;
 }
 
 /** 将指定风格的字体/字号/字重写入 CSS 变量，并同步设置面板控件 */

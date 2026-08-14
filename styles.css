@@ -107,7 +107,7 @@ body[data-theme="dark"] {
   /* 由 JS 动态设置 --clock-font 与 --clock-font-size；
      min() 视口约束保证任何字号下都不溢出 */
   font-family: var(--clock-font, 'Inter', sans-serif);
-  font-size: min(var(--clock-font-size, 96px), 20vw, 28vh);
+  font-size: min(var(--clock-font-size, 96px), calc(20vw / var(--zoom-factor, 1)), calc(28vh / var(--zoom-factor, 1)));
   font-weight: var(--clock-font-weight, 200);
   line-height: 1.05;
   letter-spacing: 0.02em;
@@ -134,8 +134,8 @@ body[data-theme="dark"] {
      --seconds-shift 秒数相对自身字号的下移量。
      缩放职责由 .seconds 承担（.seconds-wrapper 保持主字号，保证 left/margin-top
      中的 em 单位正确），analog / 横屏矮屏只需覆盖这三个变量 */
-  --seconds-scale: 0.32;
-  --seconds-font-size: 0.32em;
+  --seconds-scale: 0.28;
+  --seconds-font-size: 0.28em;
   --seconds-shift: 0.28em;
 }
 
@@ -279,7 +279,9 @@ body[data-show-seconds="off"] .time-display .seconds {
   align-items: center;
   justify-content: center;
   gap: clamp(10px, 2vw, 24px);
-  font-size: clamp(0.85rem, 2.4vw, 1.25rem);
+  /* 字号由设置面板「日期天气字号」滑动条控制（--info-font-size，px），
+     以 2.4vw 为上限保证窄屏下不溢出（窄屏自动缩小） */
+  font-size: min(var(--info-font-size, 16px), 2.4vw);
   color: var(--text-secondary);
   font-weight: 300;
   letter-spacing: 0.04em;
@@ -298,6 +300,15 @@ body[data-show-seconds="off"] .time-display .seconds {
   flex-shrink: 0;
   /* 信息条 flex 已 align-items:center —— 圆点天然处于行盒中心，与日期/天气文字
      框中心精确对齐；不加任何 transform 偏移（此前 translateY 下移导致圆点低于文字） */
+}
+
+/* 日期/天气显示开关：关闭日期或天气时，对应元素与分隔符一起隐藏；
+   info-bar 为 flex justify-content:center，剩余元素自动居中 */
+body[data-show-date="off"] .date-display,
+body[data-show-weather="off"] .weather-display,
+body[data-show-date="off"] .info-separator,
+body[data-show-weather="off"] .info-separator {
+  display: none;
 }
 
 .weather-display {
@@ -490,13 +501,16 @@ body[data-style="neon"] #clock-app::before {
    风格 3：经典模拟表盘（analog）
    ========================================================================== */
 
-/* 模拟表盘容器：可伸缩，在低分辨率下自动缩小为数字时间和信息条让出空间 */
+/* 模拟表盘容器：不吸收额外空间（flex-grow: 0），高度随表盘内容收缩，
+   表盘、数字时间、信息条作为整体在 #clock-app 内居中 —— 避免 flex:1 时
+   表盘在剩余空间内垂直居中导致表盘下方到数字时间/天气出现过大的留白。
+   保留 flex-shrink: 1 使极端缩放/低分辨率下容器可收缩、表盘按 max-height 收敛 */
 .analog-container {
   display: none;
   align-items: center;
   justify-content: center;
   width: 100%;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-height: 0;
   overflow: hidden;
 }
@@ -590,7 +604,7 @@ body[data-style="analog"] .analog-container {
 
 /* analog 风格下数字时间缩小，置于表盘下方 */
 body[data-style="analog"] .time-display {
-  font-size: min(var(--clock-font-size, 40px), 8vw, 10vh);
+  font-size: min(var(--clock-font-size, 40px), calc(8vw / var(--zoom-factor, 1)), calc(10vh / var(--zoom-factor, 1)));
   /* 模拟表盘下秒数略大、下移量更小（覆盖 --seconds-scale/--seconds-shift，
      定位 margin-top 公式自动适配，无需单独改 margin） */
   --seconds-scale: 0.42;
@@ -604,7 +618,7 @@ body[data-style="analog"][data-analog-digital="off"] .digital-container {
 }
 
 body[data-style="analog"] .info-bar {
-  font-size: clamp(0.8rem, 2.2vw, 1.1rem);
+  font-size: min(var(--info-font-size, 16px), 2.2vw);
 }
 
 /* ==========================================================================
@@ -636,37 +650,27 @@ body {
   top: max(16px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
   z-index: 60;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  border: 1px solid var(--panel-border);
-  background: var(--panel-bg);
+  width: 32px;
+  height: 32px;
+  /* 无背景、无边框、无阴影：仅保留三个点图标，减少视觉干扰与误触 */
+  border: none;
+  background: transparent;
   color: var(--text-secondary);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: var(--panel-shadow);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.25s ease, color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
-  animation: gear-nudge 3s ease-in-out 1s 2;
+  opacity: 0.75;
+  transition: opacity 0.25s ease, color 0.25s ease, transform 0.25s ease;
 }
 
 .settings-btn:hover {
   color: var(--accent-color);
-  transform: rotate(45deg) scale(1.08);
+  opacity: 1;
 }
 
 .settings-btn:active {
-  transform: rotate(45deg) scale(0.95);
-}
-
-@keyframes gear-nudge {
-  0%, 100% { transform: rotate(0); }
-  10%, 30% { transform: rotate(-12deg); }
-  20%, 40% { transform: rotate(12deg); }
-  50% { transform: rotate(0); }
+  transform: scale(0.92);
 }
 
 /* ==========================================================================
@@ -812,10 +816,16 @@ body {
   display: none;
 }
 
-/* 风格选项卡内的数字时间开关：位于风格下拉下方，顶部留间距 */
-#analog-digital-toggle-row {
+/* 风格选项卡内的「表盘尺寸」滑动条：位于风格下拉下方，顶部留间距 */
+#analog-scale-row {
   margin-top: 14px;
-  margin-bottom: 0;
+}
+
+/* 风格选项卡内的「显示数字时间」开关：位于表盘尺寸滑动条下方，
+   底部留间距与下方「显示日期」开关保持与其他元素一致的间隔 */
+#analog-digital-toggle-row {
+  margin-top: 0;
+  margin-bottom: 12px;
 }
 
 .toggle-text {
@@ -1261,26 +1271,22 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   .time-display {
-    font-size: min(var(--clock-font-size, 96px), 17vw, 30vh);
-  }
-
-  .analog-clock {
-    width: min(calc(50vw * var(--analog-scale, 1)), calc(50vh * var(--analog-scale, 1)));
+    font-size: min(var(--clock-font-size, 96px), calc(17vw / var(--zoom-factor, 1)), calc(30vh / var(--zoom-factor, 1)));
   }
 
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), 7vw, 9vh);
+    font-size: min(var(--clock-font-size, 40px), calc(7vw / var(--zoom-factor, 1)), calc(9vh / var(--zoom-factor, 1)));
   }
 
   .info-bar {
-    font-size: clamp(0.75rem, 3vw, 1.05rem);
+    font-size: min(var(--info-font-size, 16px), 3vw);
   }
 }
 
 /* --- 横屏：防止过高导致溢出，限制高度 --- */
 @media (orientation: landscape) and (max-height: 520px) {
   .time-display {
-    font-size: min(var(--clock-font-size, 96px), 26vw, 42vh);
+    font-size: min(var(--clock-font-size, 96px), calc(26vw / var(--zoom-factor, 1)), calc(42vh / var(--zoom-factor, 1)));
     /* 横屏矮屏下秒数收紧（覆盖 --seconds-scale/--seconds-font-size，定位公式自动适配） */
     --seconds-scale: 0.3;
     --seconds-font-size: 0.3em;
@@ -1290,12 +1296,8 @@ body[data-style="neon"] .custom-select-trigger.open {
     gap: 6px;
   }
 
-  .analog-clock {
-    width: min(calc(42vh * var(--analog-scale, 1)), calc(50vw * var(--analog-scale, 1)));
-  }
-
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), 12vw, 12vh);
+    font-size: min(var(--clock-font-size, 40px), calc(12vw / var(--zoom-factor, 1)), calc(12vh / var(--zoom-factor, 1)));
     /* analog 规则特异性 (0,2,1) 高于上方通用 .time-display (0,1,0)，
        需同特异性重声明秒数收紧才能覆盖 0.42 */
     --seconds-scale: 0.3;
@@ -1303,14 +1305,14 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: 0.8rem;
+    font-size: min(var(--info-font-size, 16px), 2vw);
   }
 }
 
 /* 超小屏设备（如智能手表尺寸） */
 @media (max-width: 320px) {
   .time-display {
-    font-size: min(var(--clock-font-size, 96px), 15vw, 28vh);
+    font-size: min(var(--clock-font-size, 96px), calc(15vw / var(--zoom-factor, 1)), calc(28vh / var(--zoom-factor, 1)));
   }
 
   .info-bar {
@@ -1326,7 +1328,7 @@ body[data-style="neon"] .custom-select-trigger.open {
 /* 高度很矮的横屏：信息条紧凑 */
 @media (orientation: landscape) and (max-height: 380px) {
   .info-bar {
-    font-size: 0.72rem;
+    font-size: min(var(--info-font-size, 16px), 2vw);
     gap: 8px;
   }
 
@@ -1335,41 +1337,33 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 }
 
-/* 低分辨率屏幕（高度 ≤ 700px）：表盘进一步缩小，间距收紧，防止与文字重叠 */
+/* 低分辨率屏幕（高度 ≤ 700px）：间距收紧，防止与文字重叠（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
 @media (max-height: 700px) {
   body[data-style="analog"] #clock-app {
     gap: clamp(6px, 1.5vh, 16px);
   }
 
-  .analog-clock {
-    width: min(calc(40vh * var(--analog-scale, 1)), calc(60vw * var(--analog-scale, 1)));
-  }
-
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), 7vw, 8vh);
+    font-size: min(var(--clock-font-size, 40px), calc(7vw / var(--zoom-factor, 1)), calc(8vh / var(--zoom-factor, 1)));
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: clamp(0.72rem, 2vw, 0.95rem);
+    font-size: min(var(--info-font-size, 16px), 2vw);
   }
 }
 
-/* 极矮屏幕（高度 ≤ 500px）：表盘压缩到极限，数字时间与信息条紧凑排列 */
+/* 极矮屏幕（高度 ≤ 500px）：数字时间与信息条紧凑排列（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
 @media (max-height: 500px) {
   body[data-style="analog"] #clock-app {
     gap: 4px;
   }
 
-  .analog-clock {
-    width: min(calc(34vh * var(--analog-scale, 1)), calc(50vw * var(--analog-scale, 1)));
-  }
-
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), 6vw, 7vh);
+    font-size: min(var(--clock-font-size, 40px), calc(6vw / var(--zoom-factor, 1)), calc(7vh / var(--zoom-factor, 1)));
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: 0.7rem;
+    font-size: min(var(--info-font-size, 16px), 1.8vw);
   }
 }
 

@@ -30,11 +30,14 @@ const ZOOM_MIN = 50, ZOOM_MAX = 200, ZOOM_STEP = 10;
 /** 将 state.globalZoom（百分比）应用到 body 的 CSS zoom，实现页面级整体缩放。
     CSS zoom 会按比例缩放布局尺寸（含 fixed 定位的设置按钮/面板），
     视觉效果等效浏览器缩放；真正的浏览器缩放级别无法由网页 JS 直接控制，
-    故采用 zoom 作为等效方案。 */
+    故采用 zoom 作为等效方案。
+    同时写入 --zoom-factor（数字，= zoom/100）：数字时间的字号 vw/vh 约束
+    除以该因子，使 zoom 放大时数字时间视觉尺寸保持 fit、秒数/AM/PM 不溢出屏幕 */
 function applyZoom() {
   const z = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, state.globalZoom));
   state.globalZoom = z;
   document.body.style.zoom = String(z / 100);
+  document.documentElement.style.setProperty('--zoom-factor', String(z / 100));
   const val = $('#zoom-value');
   if (val) val.textContent = `${z}%`;
 }
@@ -89,7 +92,13 @@ function setupCustomSelects() {
         li.textContent = opt.textContent;
         li.dataset.value = opt.value;
         if (opt.selected) li.classList.add('selected');
-        li.addEventListener('click', () => {
+        li.addEventListener('click', (e) => {
+          // 阻止 click 冒泡到包裹层 <label>：label 的默认行为会把点击转发给
+          // 其内部第一个表单控件（trigger 按钮），导致 closeCurrent 后又触发
+          // trigger 的 open() 重新展开菜单（字体/天气源下拉被 label 包裹，
+          // 风格/配色下拉没有 —— 这正是只有前两者不能收回的根因）
+          e.preventDefault();
+          e.stopPropagation();
           if (select.value !== opt.value) {
             select.value = opt.value;
             select.dispatchEvent(new Event('change', { bubbles: true }));
@@ -264,6 +273,42 @@ function setupSettingsPanel() {
       state.showAmpm = e.target.checked;
       saveState();
       window.ClockRender.tick();
+    });
+  }
+
+  // 日期显示开关（隐藏日期时 info-bar 的分隔符随之隐藏，剩余元素仍居中）
+  const showDateToggle = $('#show-date-toggle');
+  if (showDateToggle) {
+    showDateToggle.checked = state.showDate;
+    document.body.dataset.showDate = state.showDate ? 'on' : 'off';
+    showDateToggle.addEventListener('change', (e) => {
+      state.showDate = e.target.checked;
+      document.body.dataset.showDate = state.showDate ? 'on' : 'off';
+      saveState();
+    });
+  }
+
+  // 天气显示开关（隐藏天气时 info-bar 的分隔符随之隐藏，剩余元素仍居中）
+  const showWeatherToggle = $('#show-weather-toggle');
+  if (showWeatherToggle) {
+    showWeatherToggle.checked = state.showWeather;
+    document.body.dataset.showWeather = state.showWeather ? 'on' : 'off';
+    showWeatherToggle.addEventListener('change', (e) => {
+      state.showWeather = e.target.checked;
+      document.body.dataset.showWeather = state.showWeather ? 'on' : 'off';
+      saveState();
+    });
+  }
+
+  // 日期/天气字号滑动条：写入 --info-font-size 供 .info-bar 使用
+  const infoFontSlider = $('#info-font-slider');
+  if (infoFontSlider) {
+    infoFontSlider.value = String(state.infoFontSize);
+    document.documentElement.style.setProperty('--info-font-size', `${state.infoFontSize}px`);
+    infoFontSlider.addEventListener('input', (e) => {
+      state.infoFontSize = Number(e.target.value);
+      document.documentElement.style.setProperty('--info-font-size', `${state.infoFontSize}px`);
+      saveState();
     });
   }
 
