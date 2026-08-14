@@ -1,0 +1,1763 @@
+/* ==========================================================================
+   Fullscreen Web Clock - styles.css
+   ========================================================================== */
+
+/* ---------- 1. Reset & Base ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  /* 原生控件（下拉列表弹出层、滚动条等）默认按浅色渲染，深色模式在下方覆盖 */
+  color-scheme: light;
+  /* 主题变量（浅色为默认值，深色在下方覆盖） */
+  --bg-color: #f2f3f7;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #ffffff 0%, #eef0f6 100%);
+  --text-color: #14151c;
+  --text-secondary: #6b7180;
+  --text-tertiary: #9aa0ae;
+  --accent-color: #3b82f6;
+  --accent-rgb: 59, 130, 246;
+  /* 时间数字主色：以主色为倾向的文字色（accent 30% + text 70%），
+     使数字在浅/深模式、各配色预设下都带明显而协调的色彩倾向；
+     color-mix 引用变量时在 .time-display 使用点求值，故自动跟随
+     neon 风格 / 配色预设覆盖后的 --accent-color / --text-color；
+     不支持 color-mix 的旧浏览器忽略该声明 → 回退 var(--text-color) */
+  --digit-color: color-mix(in srgb, var(--accent-color) 30%, var(--text-color));
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(20, 21, 28, 0.08);
+  --panel-shadow: 0 24px 60px rgba(20, 21, 28, 0.16);
+  --control-bg: #eceef4;
+  --control-hover: #e0e4ee;
+  --control-active: #d4d9e6;
+  --divider: rgba(20, 21, 28, 0.08);
+  --neon-glow: rgba(59, 130, 246, 0.35);
+
+  background: var(--bg-gradient);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.6s ease, color 0.6s ease;
+}
+
+body[data-theme="dark"] {
+  /* 深色模式下原生控件按深色渲染，避免浅色系统列表 + 亮字看不清 */
+  color-scheme: dark;
+  --bg-color: #0d0e16;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #16182a 0%, #0a0b12 100%);
+  --text-color: #e8eaf2;
+  --text-secondary: #a8adbd;
+  --text-tertiary: #63697c;
+  --accent-color: #6aa6ff;
+  --accent-rgb: 106, 166, 255;
+  --panel-bg: rgba(26, 28, 44, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #22243a;
+  --control-hover: #2b2e4a;
+  --control-active: #343860;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(106, 166, 255, 0.45);
+}
+
+/* ---------- 2. 主布局 ---------- */
+
+#clock-app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 3vh, 36px);
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* 关键元素不溢出 */
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- 3. 数字时间 ---------- */
+
+.digital-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  flex-shrink: 0;
+}
+
+.time-display {
+  /* 由 JS 动态设置 --clock-font 与 --clock-font-size；
+     min() 视口约束保证任何字号下都不溢出 */
+  font-family: var(--clock-font, 'Inter', sans-serif);
+  font-size: min(var(--clock-font-size, 96px), 20vw, 28vh);
+  font-weight: var(--clock-font-weight, 200);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  /* 时间数字颜色：带主色倾向的强调色（由 body --digit-color 提供，
+     自动跟随浅/深模式与配色预设；不支持 color-mix 时回退 text-color）。
+     冒号继承同色，与数字协调；秒数/AM/PM 由各自规则设为次要色 */
+  color: var(--digit-color, var(--text-color));
+  /* 锚点布局：容器铺满数字区全宽，子元素全部绝对定位，左右两侧均以
+     50%（视口中线）为基准向两侧展开 —— 以冒号为基准锚定时/分/秒，
+     右侧内容（秒数、AM/PM）宽度变化不再影响左侧时/分的位置 */
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  /* 上下对称 padding 撑起容器高度（恰好一行行高 1.05em），数字行垂直
+     居中于容器 → top:50% 即数字行中心（与冒号 Y 轴基准一致） */
+  padding-top: 0.525em;
+  padding-bottom: 0.525em;
+  /* 秒数单元参数（本容器为主字号上下文，所有定位 calc 的 em 均相对主字号）：
+     --seconds-scale 秒数字号相对主字号比例（数字，供 margin-top 乘法）；
+     --seconds-font-size 秒数字号（长度，供 font-size 直接使用 —— 注意
+       font-size 不接受无单位数字值，var() 替换纯数字会被浏览器丢弃）；
+     --seconds-shift 秒数相对自身字号的下移量。
+     缩放职责由 .seconds 承担（.seconds-wrapper 保持主字号，保证 left/margin-top
+     中的 em 单位正确），analog / 横屏矮屏只需覆盖这三个变量 */
+  --seconds-scale: 0.32;
+  --seconds-font-size: 0.32em;
+  --seconds-shift: 0.28em;
+}
+
+.time-display .hours,
+.time-display .minutes {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 冒号：绝对定位于 time-display 的水平/垂直中点。
+   - X 轴：.digital-container 已将 time-display 整体水平居中（左缘到视口中线
+     距离 = 右缘到视口中线距离），left:50% 即视口水平中点 → 无论小时位数、
+     秒数、AM/PM 是否存在、字号多大，冒号中心始终严格对齐屏幕 X 轴中点；
+   - Y 轴：top:50% 以实际显示区域（time-display 内容盒 = 数字行盒高度）为
+     基准自适应居中，任意屏幕尺寸/分辨率下位置恒定。
+   translateY(-52%) 为光学微调（冒号字形视觉中心通常略低于数字字形中心）。 */
+.time-display .colon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -52%);
+  margin: 0;
+  /* 最上层（安全网）：时/分数字锚定在 --clock-colon-gap（≥0.2em）空隙之外、
+     永不到达冒号，此处确保任何叠加/层叠情况下冒号始终完整可见 */
+  z-index: 1000;
+}
+
+/* 时/分数字组：以冒号为基准锚定左右。
+   - 右/左缘 = 冒号中心 ± var(--clock-colon-gap) 冒号空隙（由数字间距滑块联动
+     派生：colonGap = clamp(0.3 + gap*0.25, 0.2, 0.6)，默认 0.3em；方向与数字
+     间距一致（数字拉开冒号同步外移、层叠时收敛），下限 0.2em 已考虑冒号自身
+     宽度，保证任何间距下数字都不会与冒号重叠或覆盖冒号）：
+       · --clock-colon-gap：冒号 ↔ 时/分数字组的空隙（时、分、秒整体联动）
+       · --clock-digit-gap：组内数字之间间隔（负值=字符层叠），只影响组内
+   - margin-top: -0.525em（= 半行高，em 相对自身字号）把行盒中心对齐容器
+     中线，垂直位置与原 flex 布局保持一致 */
+.time-display .hours,
+.time-display .minutes {
+  position: absolute;
+  top: 50%;
+  margin: 0;
+  margin-top: -0.525em;
+}
+
+.time-display .hours {
+  right: calc(50% + var(--clock-colon-gap, 0.3em));
+}
+
+.time-display .minutes {
+  left: calc(50% + var(--clock-colon-gap, 0.3em));
+}
+
+/* 秒数 + AM/PM 单元：紧随分钟组右侧（左缘 = 分钟右缘 + 0.18em 基础空隙
+   + gap 联动，minutes 恒为 2 位，宽度 = 2 × 数字槽位 + 组内 1 个 gap）。
+   冒号空隙部分同样引用 var(--clock-colon-gap) —— 冒号间距变化时秒数整体
+   跟随分钟右缘联动，秒数自身间距恒定、与 AM/PM 保持一致，且永不与分钟/
+   冒号重叠。
+   font-size 保持主字号（缩放由内部 .seconds 承担），因此 left/margin-top
+   中的 em 均为主字号单位，与 .hours/.minutes/.digit 的间距变量一致 */
+.time-display .seconds-wrapper {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + var(--clock-colon-gap, 0.3em) + 0.18em + 2 * var(--clock-digit-width, 0.62em) + var(--clock-digit-gap, 0em));
+  /* 固定宽度 = 2 个数字槽位宽度（× 秒数缩放系数）：即使秒数隐藏（display:none）
+     wrapper 宽度仍保持恒定，AM/PM 的 left:50% 水平居中基准不随秒数开关漂移。
+     --clock-digit-width 为 em（相对主字号），--seconds-scale 为数字，相乘得长度 */
+  width: calc(2 * var(--clock-digit-width, 0.62em) * var(--seconds-scale, 0.32));
+  font-weight: 300;
+  color: var(--text-secondary);
+  opacity: 0.85;
+  /* 垂直：小字行盒中心 = 容器中线 + (--seconds-shift × --seconds-scale)，
+     等效原 align-self:center + translateY(0.28em)。用 margin-top 而非 transform ——
+     transform 会创建层叠上下文，使秒数无法与时/分数字按全局 z-index
+     层叠（要求最左在上、往右依次降低） */
+  margin-top: calc(-0.5 * var(--seconds-scale) * 1.05em + var(--seconds-shift) * var(--seconds-scale));
+  margin-left: 0;
+  /* AM/PM 定位包含块：absolute 后代在 margin 偏移后的坐标空间中定位，
+     因此 AM/PM 随秒数整体下移，12/24 小时制切换时秒数位置保持恒定 */
+}
+
+.time-display .seconds {
+  /* 块级：从 .seconds-wrapper 顶部排布，摆脱行内 baseline 下沉（否则会在
+     92px 行盒中按基线对齐，秒数被推到行盒底部、超出主显示行）；
+     wrapper 高度随之收缩为秒数字行高，使 margin-top 公式精确生效 */
+  display: block;
+  font-variant-numeric: tabular-nums;
+  /* 秒数字号缩放（相对主字号，长度值），仅缩放内部数字，不影响定位计算 */
+  font-size: var(--seconds-font-size);
+  /* 行高用数字（相对自身字号），与内部 .digit 一致，数字垂直居中 */
+  line-height: 1.05;
+}
+
+/* 每个数字独立槽位：同宽 + 居中，任意字体（含非等宽）下数字位置恒定、互不干扰；
+   --clock-digit-width 由 JS 按当前字体实测最宽数字（em 单位，随字号自适应）；
+   position:relative 为层叠基础（z-index 由 JS 按全局从左到右递减设置） */
+.time-display .digit {
+  display: inline-block;
+  width: var(--clock-digit-width, 0.62em);
+  text-align: center;
+  letter-spacing: 0;
+  position: relative;
+}
+
+/* 数字间距：仅时/分数字参与（--clock-digit-gap，em，可为负 → 字符层叠效果），
+   由设置面板滑动条调节，按风格独立持久化（JS 写入根变量）；
+   秒数间距固定为 0（不设 margin，不受滑杆影响），与 AM/PM 保持一致的稳定样式 */
+.time-display .hours .digit + .digit,
+.time-display .minutes .digit + .digit {
+  margin-left: var(--clock-digit-gap, 0em);
+}
+
+/* AM/PM 标识：绝对定位于秒数正上方居中，与秒数组成整体单元（不占文档流，
+   切换 12/24 小时制时秒数对齐完全不受影响） */
+.time-display .ampm {
+  position: absolute;
+  bottom: calc(100% + 0.18em);
+  left: 50%;
+  transform: translateX(-50%);
+  /* 相对主字号：0.32em × 0.75 = 0.24em（随 --seconds-font-size 联动 ——
+     不能用 --seconds-scale 数字相乘：font-size 不接受无单位 calc 结果，
+     会被浏览器丢弃回退继承值，导致 AM/PM 与主字号同大、覆盖分钟数字） */
+  font-size: calc(var(--seconds-font-size, 0.32em) * 0.75);
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* 秒数显示开关：关闭时只隐藏 .seconds（block 元素），保留 .seconds-wrapper
+   作为 AM/PM 的定位包含块 —— wrapper 高度归零后 AM/PM 的 bottom:calc(100%+0.18em)
+   仍锚定在秒数行顶上方，AM/PM 位置不变，实现秒数与 AM/PM 开关完全独立。
+   由设置面板开关控制（JS 写 body[data-show-seconds]），不影响冒号锚定的时/分布局 */
+body[data-show-seconds="off"] .time-display .seconds {
+  display: none;
+}
+
+/* ---------- 4. 信息条（日期 + 天气） ---------- */
+
+.info-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 24px);
+  font-size: clamp(0.85rem, 2.4vw, 1.25rem);
+  color: var(--text-secondary);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  max-width: 96vw;
+  flex-wrap: wrap;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.info-separator {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+  /* 信息条 flex 已 align-items:center —— 圆点天然处于行盒中心，与日期/天气文字
+     框中心精确对齐；不加任何 transform 偏移（此前 translateY 下移导致圆点低于文字） */
+}
+
+.weather-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.weather-icon {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.weather-text {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   风格 1：极简风（minimal）
+   ========================================================================== */
+
+body[data-style="minimal"] .time-display {
+  /* 字重引用 CSS 变量（由设置面板字重滑动条控制），不可硬编码覆盖；
+     颜色继承基础 .time-display 的 --digit-color（带主色倾向） */
+  font-weight: var(--clock-font-weight, 200);
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.06);
+}
+
+body[data-style="minimal"] .info-bar {
+  color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   风格 2：霓虹风（neon）—— 始终使用深色底，凸显霓虹光效
+   ========================================================================== */
+
+body[data-style="neon"] {
+  --bg-color: #05060f;
+  --bg-gradient: radial-gradient(ellipse at 50% 0%, #10122b 0%, #05060f 70%);
+  --text-color: #e6fbff;
+  --text-secondary: #8de9ff;
+  --text-tertiary: #7fa8c9;
+  --accent-color: #00e5ff;
+  --accent-rgb: 0, 229, 255;
+  --panel-bg: rgba(12, 15, 34, 0.95);
+  /* 以下描边/分隔线/光晕统一由 --accent-rgb 派生：默认霓虹为青色；
+     切换配色预设时自动跟随新主色（预设规则位于文件末尾，覆盖 accent 后即时生效） */
+  --panel-border: rgba(var(--accent-rgb), 0.28);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --control-bg: #1a2340;
+  --control-hover: #232f54;
+  --control-active: #2c3b68;
+  --divider: rgba(var(--accent-rgb), 0.16);
+  --neon-glow: rgba(var(--accent-rgb), 0.55);
+  /* 原生控件（下拉列表、滚动条等）以深色主题渲染，避免浅色系统列表 + 亮字看不清；
+     浅色配色预设规则位于文件末尾，会以 color-scheme: light 覆盖本值 */
+  color-scheme: dark;
+}
+
+body[data-style="neon"] .time-display {
+  /* 颜色继承基础 .time-display 的 --digit-color（自动联动 neon 的
+     --accent-color / --text-color，深色下为亮青白、浅色下为深青蓝） */
+  /* 光晕色由 --accent-rgb 驱动：切换配色预设时光效实时联动更新 */
+  text-shadow:
+    0 0 8px rgba(var(--accent-rgb), 0.9),
+    0 0 24px rgba(var(--accent-rgb), 0.6),
+    0 0 64px rgba(var(--accent-rgb), 0.4),
+    0 0 120px rgba(var(--accent-rgb), 0.2);
+}
+
+body[data-style="neon"] .time-display .seconds-wrapper,
+body[data-style="neon"] .time-display .ampm {
+  color: var(--text-secondary);
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.55);
+}
+
+body[data-style="neon"] .time-display .colon {
+  text-shadow:
+    0 0 8px rgba(var(--accent-rgb), 0.9),
+    0 0 24px rgba(var(--accent-rgb), 0.6),
+    0 0 64px rgba(var(--accent-rgb), 0.4);
+}
+
+body[data-style="neon"] .info-bar {
+  color: var(--text-secondary);
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.35);
+}
+
+body[data-style="neon"] .info-separator {
+  background: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6);
+}
+
+/* ---------- 霓虹风 · 浅色模式适配 ----------
+   neon 深色规则（上方 body[data-style="neon"]）默认始终深色底；当用户选择
+   浅色/自动模式（白天）时，默认「星蓝」预设需要可读的浅色霓虹配色：
+   - 变量规则限定 [data-palette="default"]：选择器 (0,4,0) 高于深色 (0,2,0)，
+     覆盖为浅色；同时不匹配其它配色预设 → 其它预设的浅色变量规则（文件末尾，
+     (0,2,0)）正常生效，预设联动不被破坏。
+   - 光晕弱化规则不限 palette（浅色下所有霓虹光效都应收敛，避免白底光晕
+     糊成一片），(0,4,1) 高于深色光晕 (0,3,1)，全部覆盖。 */
+body[data-style="neon"][data-theme="light"][data-palette="default"] {
+  color-scheme: light;
+  --bg-color: #e9eefb;
+  --bg-gradient: radial-gradient(ellipse at 50% 0%, #ffffff 0%, #dbe4f8 70%);
+  --text-color: #18274d;
+  --text-secondary: #3d5f9e;
+  --text-tertiary: #8496bd;
+  --accent-color: #0b7fc4;
+  --accent-rgb: 11, 127, 196;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(24, 39, 77, 0.10);
+  --panel-shadow: 0 24px 60px rgba(18, 46, 96, 0.18);
+  --control-bg: #dfe7f6;
+  --control-hover: #d2dcf0;
+  --control-active: #c3d1ea;
+  --divider: rgba(24, 39, 77, 0.08);
+  --neon-glow: rgba(11, 127, 196, 0.35);
+}
+
+/* 浅色模式下霓虹光晕整体收敛（数字/冒号/秒数/AM-PM/信息条/光斑） */
+body[data-style="neon"][data-theme="light"] .time-display {
+  text-shadow:
+    0 1px 18px rgba(var(--accent-rgb), 0.30),
+    0 0 48px rgba(var(--accent-rgb), 0.14);
+}
+
+body[data-style="neon"][data-theme="light"] .time-display .seconds-wrapper,
+body[data-style="neon"][data-theme="light"] .time-display .ampm {
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.25);
+}
+
+body[data-style="neon"][data-theme="light"] .time-display .colon {
+  text-shadow:
+    0 1px 14px rgba(var(--accent-rgb), 0.32),
+    0 0 36px rgba(var(--accent-rgb), 0.16);
+}
+
+body[data-style="neon"][data-theme="light"] .info-bar {
+  text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.18);
+}
+
+body[data-style="neon"][data-theme="light"] .info-separator {
+  box-shadow: 0 0 4px rgba(var(--accent-rgb), 0.35);
+}
+
+body[data-style="neon"][data-theme="light"] #clock-app::before {
+  background:
+    radial-gradient(circle at 20% 30%, rgba(var(--accent-rgb), 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(var(--accent-rgb), 0.04) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.03) 0%, transparent 60%);
+}
+
+/* 霓虹风：下拉框以主题色描边强化霓虹质感；背景/文字/箭头/选项全部走 CSS 变量
+   （基础 .setting-select 规则），与配色预设、浅深模式完全联动，无硬编码颜色冲突 */
+body[data-style="neon"] .setting-select {
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+
+body[data-style="neon"] .setting-select:hover,
+body[data-style="neon"] .setting-select:focus {
+  border-color: var(--accent-color);
+}
+
+/* 霓虹风格的背景光晕动效（光斑颜色同样由 --accent-rgb 驱动） */
+body[data-style="neon"] #clock-app::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 20% 30%, rgba(var(--accent-rgb), 0.07) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(var(--accent-rgb), 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(var(--accent-rgb), 0.04) 0%, transparent 60%);
+  animation: neon-breathe 8s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#clock-app > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes neon-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+/* ==========================================================================
+   风格 3：经典模拟表盘（analog）
+   ========================================================================== */
+
+/* 模拟表盘容器：可伸缩，在低分辨率下自动缩小为数字时间和信息条让出空间 */
+.analog-container {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body[data-style="analog"] .analog-container {
+  display: flex;
+}
+
+.analog-clock {
+  /* 宽度由视口比例主导（高度为主、宽度为辅），乘以 --analog-scale 缩放系数
+     （设置面板「表盘尺寸」滑动条控制，默认 1）——纯 vh/vw 比例、无固定像素上限，
+     窗口大小改变时表盘跟随比例缩放而非固定像素大小 */
+  width: min(calc(52vh * var(--analog-scale, 1)), calc(70vw * var(--analog-scale, 1)));
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  overflow: visible;
+  /* 表盘文字/刻度/表针统一经 color（var 兼容所有浏览器）+ currentColor 继承主题色，
+     规避部分浏览器在 SVG fill/stroke 中直接使用 var() 失效导致深色模式下文字不可读 */
+  color: var(--text-color);
+}
+
+/* 表盘元素 —— 颜色全部经 currentColor 传入（各元素 color 已在 HTML 内联样式或上方容器中定义） */
+.clock-face-outer {
+  fill: currentColor;   /* color 来自内联 style="color: var(--bg-color)" */
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  opacity: 0.9;
+}
+
+.clock-face-inner {
+  fill: currentColor;   /* color 来自内联 style="color: var(--bg-color)" */
+  stroke: var(--divider);
+  stroke-width: 1;
+  fill-opacity: 0.35;
+}
+
+.minute-tick {
+  stroke: currentColor; /* color 来自 <g id="minute-ticks"> 内联 style="color: var(--text-tertiary)" */
+  stroke-width: 1.2;
+  opacity: 0.7;
+}
+
+.hour-marker {
+  stroke: currentColor; /* color 继承自 .analog-clock */
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.hour-number {
+  fill: currentColor;   /* color 继承自 .analog-clock（深色模式下为亮色，可读性不受 SVG var() 兼容性影响） */
+  font-family: 'Cinzel', 'Playfair Display', serif;
+  font-size: 26px;
+  font-weight: 400;
+  text-anchor: middle;
+  dominant-baseline: central;
+  opacity: 0.9;
+}
+
+.hour-hand,
+.minute-hand {
+  stroke: currentColor; /* color 继承自 .analog-clock */
+  stroke-linecap: round;
+}
+
+.hour-hand {
+  stroke-width: 9;
+}
+
+.minute-hand {
+  stroke-width: 6;
+  opacity: 0.85;
+}
+
+.second-hand {
+  stroke: currentColor; /* color 来自内联 style="color: var(--accent-color)" */
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.clock-center-outer {
+  fill: currentColor;   /* color 来自内联 style="color: var(--bg-color)" */
+  stroke: var(--accent-color);
+  stroke-width: 2;
+}
+
+.clock-center-inner {
+  fill: currentColor;   /* color 来自内联 style="color: var(--accent-color)" */
+}
+
+/* analog 风格下数字时间缩小，置于表盘下方 */
+body[data-style="analog"] .time-display {
+  font-size: min(var(--clock-font-size, 40px), 8vw, 10vh);
+  /* 模拟表盘下秒数略大、下移量更小（覆盖 --seconds-scale/--seconds-shift，
+     定位 margin-top 公式自动适配，无需单独改 margin） */
+  --seconds-scale: 0.42;
+  --seconds-font-size: 0.42em;
+  --seconds-shift: 0.12em;
+}
+
+/* analog 风格：数字时间显示开关关闭时，隐藏整个数字时间区域 */
+body[data-style="analog"][data-analog-digital="off"] .digital-container {
+  display: none;
+}
+
+body[data-style="analog"] .info-bar {
+  font-size: clamp(0.8rem, 2.2vw, 1.1rem);
+}
+
+/* ==========================================================================
+   风格切换动画
+   ========================================================================== */
+
+body {
+  transition:
+    background-color 0.6s ease,
+    color 0.6s ease;
+}
+
+.time-display,
+.info-bar,
+.analog-clock {
+  transition:
+    color 0.5s ease,
+    text-shadow 0.5s ease,
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+
+/* ==========================================================================
+   5. 设置按钮
+   ========================================================================== */
+
+.settings-btn {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 60;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  color: var(--text-secondary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--panel-shadow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.25s ease, color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+  animation: gear-nudge 3s ease-in-out 1s 2;
+}
+
+.settings-btn:hover {
+  color: var(--accent-color);
+  transform: rotate(45deg) scale(1.08);
+}
+
+.settings-btn:active {
+  transform: rotate(45deg) scale(0.95);
+}
+
+@keyframes gear-nudge {
+  0%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(-12deg); }
+  20%, 40% { transform: rotate(12deg); }
+  50% { transform: rotate(0); }
+}
+
+/* ==========================================================================
+   6. 设置面板
+   ========================================================================== */
+
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.settings-overlay.show {
+  opacity: 1;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  width: min(380px, 92vw);
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--panel-shadow);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(105%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-panel.open {
+  transform: translateX(0);
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+.settings-header h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.close-btn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.close-btn:hover {
+  background: var(--control-hover);
+  color: var(--text-color);
+}
+
+.settings-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 22px 24px;
+  overscroll-behavior: contain;
+}
+
+.setting-group {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.setting-group:last-child {
+  border-bottom: none;
+}
+
+.setting-group h3 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.setting-group h3 .current-style-label {
+  text-transform: none;
+  font-size: 0.72rem;
+  background: var(--control-bg);
+  padding: 2px 8px;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* 通用切换按钮组 */
+.toggle-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 开关行（文字 + 滑动开关） */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* 按钮组与紧随的开关行之间保持一致间距：仅作用于 .toggle-group 之后的
+   .toggle-row（如「时间格式」按钮组下方的「显示秒数」开关），不影响
+   「主题模式」按钮组——其后跟的是 .setting-hint（已有 margin-top:10px） */
+.toggle-group + .toggle-row {
+  margin-top: 14px;
+}
+
+.toggle-row[hidden] {
+  display: none;
+}
+
+/* 风格选项卡内的数字时间开关：位于风格下拉下方，顶部留间距 */
+#analog-digital-toggle-row {
+  margin-top: 14px;
+  margin-bottom: 0;
+}
+
+.toggle-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.toggle-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--control-active);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+  outline: none;
+}
+
+.toggle-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s ease;
+}
+
+.toggle-switch:checked {
+  background: var(--accent-color);
+}
+
+.toggle-switch:checked::after {
+  transform: translateX(20px);
+}
+
+.toggle-switch:focus-visible {
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.35);
+}
+
+.format-option,
+.theme-option {
+  flex: 1;
+  min-width: 72px;
+  padding: 9px 10px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+
+.format-option:hover,
+.theme-option:hover {
+  border-color: var(--accent-color);
+  color: var(--text-color);
+}
+
+.format-option.active,
+.theme-option.active {
+  border-color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-color);
+}
+
+.setting-hint {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+/* 字体设置 */
+.setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* hidden 属性下强制隐藏（覆盖 .setting-label 的 display:flex，
+   表盘尺寸滑动条等按风格动态显示/隐藏需要生效） */
+.setting-label[hidden] {
+  display: none;
+}
+
+/* 全局缩放控制：标签（含当前值）+ 加减按钮，样式与字体设置/按钮组保持一致 */
+.zoom-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.zoom-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.zoom-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.zoom-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.zoom-btn:active {
+  transform: scale(0.96);
+}
+
+/* 清空字体缓存按钮：与上方滑杆拉开间距 */
+#clear-font-cache-btn {
+  margin-top: 4px;
+}
+
+/* CMA 不稳定警告提示 */
+#cma-warning {
+  color: #d97706;
+  font-weight: 500;
+}
+
+body[data-theme="dark"] #cma-warning {
+  color: #fbbf24;
+}
+
+.label-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 滑杆当前值标签（等宽数字，拖动时宽度稳定不抖动） */
+.slider-value {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.12);
+  padding: 1px 8px;
+  border-radius: 20px;
+}
+
+.setting-select {
+  width: 100%;
+  /* 右侧预留箭头空间，避免文字与箭头重叠 */
+  padding: 10px 26px 10px 12px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  /* 下拉箭头：两段线性渐变拼成向下 “V” 形，颜色取 var(--text-tertiary)，
+     与配色预设/浅深模式完全联动（替代固定颜色 SVG 图，修复下拉列表颜色冲突） */
+  background-image:
+    linear-gradient(45deg, var(--text-tertiary) 50%, transparent 50%),
+    linear-gradient(135deg, transparent 50%, var(--text-tertiary) 50%);
+  background-repeat: no-repeat;
+  background-position:
+    calc(100% - 16px) 55%,
+    calc(100% - 11px) 55%;
+  background-size: 5px 5px, 5px 5px;
+}
+
+.setting-select:focus {
+  border-color: var(--accent-color);
+}
+
+/* 下拉列表弹出层的选项：颜色统一走主题变量，与面板/配色预设一致，
+   避免部分浏览器按系统色渲染导致深色模式下白底黑字看不清 */
+.setting-select option,
+.setting-select optgroup {
+  background-color: var(--control-bg);
+  color: var(--text-color);
+}
+
+.setting-select option:checked {
+  background-color: rgba(var(--accent-rgb), 0.25);
+  color: var(--text-color);
+}
+
+/* ==========================================================================
+   自定义下拉组件（替代原生 select 外观，展开列表完整适配主题 + 圆角）
+   ========================================================================== */
+
+.custom-select {
+  position: relative;
+  width: 100%;
+}
+
+/* 原 select 隐藏（仅承载 value/change 语义），显示由 trigger + menu 承担 */
+.custom-select select.setting-select {
+  display: none;
+}
+
+/* 触发按钮：复刻原 .setting-select 外观（padding/边框/圆角/背景），
+   箭头改用 border chevron（清晰完整，修复原渐变箭头显示不完整） */
+.custom-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  transition: border-color 0.2s ease;
+}
+
+.custom-select-trigger:hover,
+.custom-select-trigger.open {
+  border-color: var(--accent-color);
+}
+
+.custom-select-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 下拉箭头：border-right + border-bottom 旋转 45° 构成向下 chevron，
+   展开时旋转 225° 指向上方；颜色跟随 --text-tertiary */
+.custom-select-trigger::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-tertiary);
+  border-bottom: 2px solid var(--text-tertiary);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.custom-select-trigger.open::after {
+  transform: rotate(225deg) translateY(2px);
+}
+
+/* 展开列表：圆角 + 主题背景/边框/阴影，完整适配风格 */
+.custom-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 120;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: var(--panel-shadow);
+}
+
+.custom-select-option {
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.custom-select-option:hover {
+  background: var(--control-hover);
+}
+
+.custom-select-option.selected {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
+}
+
+/* neon 风格：触发按钮以主题色描边（与原 .setting-select neon 规则一致） */
+body[data-style="neon"] .custom-select-trigger {
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+
+body[data-style="neon"] .custom-select-trigger:hover,
+body[data-style="neon"] .custom-select-trigger.open {
+  border-color: var(--accent-color);
+}
+
+.setting-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--text-color);
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.setting-input:focus {
+  border-color: var(--accent-color);
+}
+
+.setting-input::placeholder {
+  color: var(--text-tertiary, rgba(128, 128, 128, 0.7));
+}
+
+.setting-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--control-bg);
+  outline: none;
+  cursor: pointer;
+}
+
+.setting-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.4);
+  cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+.setting-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.setting-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.4);
+  cursor: grab;
+}
+
+/* 天气状态与操作按钮 */
+.weather-status {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.6;
+  min-height: 1.4em;
+}
+
+.weather-status.error {
+  color: #e05c5c;
+}
+
+/* 时间同步状态（设置面板） */
+.sync-status {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  line-height: 1.6;
+  min-height: 1.4em;
+}
+.sync-status.error {
+  color: #e05c5c;
+}
+
+.action-btn {
+  width: 100%;
+  padding: 11px;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  background: var(--control-bg);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.action-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.action-btn:active {
+  transform: scale(0.98);
+}
+
+.settings-footer {
+  padding: 14px 22px;
+  border-top: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+.footer-note {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+/* ==========================================================================
+   7. 横竖屏适配
+   ========================================================================== */
+
+/* --- 竖屏：数字时间纵向堆叠、字号适配 --- */
+@media (orientation: portrait) {
+  #clock-app {
+    gap: clamp(10px, 3vh, 30px);
+  }
+
+  .time-display {
+    font-size: min(var(--clock-font-size, 96px), 17vw, 30vh);
+  }
+
+  .analog-clock {
+    width: min(calc(50vw * var(--analog-scale, 1)), calc(50vh * var(--analog-scale, 1)));
+  }
+
+  body[data-style="analog"] .time-display {
+    font-size: min(var(--clock-font-size, 40px), 7vw, 9vh);
+  }
+
+  .info-bar {
+    font-size: clamp(0.75rem, 3vw, 1.05rem);
+  }
+}
+
+/* --- 横屏：防止过高导致溢出，限制高度 --- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .time-display {
+    font-size: min(var(--clock-font-size, 96px), 26vw, 42vh);
+    /* 横屏矮屏下秒数收紧（覆盖 --seconds-scale/--seconds-font-size，定位公式自动适配） */
+    --seconds-scale: 0.3;
+    --seconds-font-size: 0.3em;
+  }
+
+  #clock-app {
+    gap: 6px;
+  }
+
+  .analog-clock {
+    width: min(calc(42vh * var(--analog-scale, 1)), calc(50vw * var(--analog-scale, 1)));
+  }
+
+  body[data-style="analog"] .time-display {
+    font-size: min(var(--clock-font-size, 40px), 12vw, 12vh);
+    /* analog 规则特异性 (0,2,1) 高于上方通用 .time-display (0,1,0)，
+       需同特异性重声明秒数收紧才能覆盖 0.42 */
+    --seconds-scale: 0.3;
+    --seconds-font-size: 0.3em;
+  }
+
+  body[data-style="analog"] .info-bar {
+    font-size: 0.8rem;
+  }
+}
+
+/* 超小屏设备（如智能手表尺寸） */
+@media (max-width: 320px) {
+  .time-display {
+    font-size: min(var(--clock-font-size, 96px), 15vw, 28vh);
+  }
+
+  .info-bar {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .info-separator {
+    display: none;
+  }
+}
+
+/* 高度很矮的横屏：信息条紧凑 */
+@media (orientation: landscape) and (max-height: 380px) {
+  .info-bar {
+    font-size: 0.72rem;
+    gap: 8px;
+  }
+
+  .analog-container {
+    max-height: 40vh;
+  }
+}
+
+/* 低分辨率屏幕（高度 ≤ 700px）：表盘进一步缩小，间距收紧，防止与文字重叠 */
+@media (max-height: 700px) {
+  body[data-style="analog"] #clock-app {
+    gap: clamp(6px, 1.5vh, 16px);
+  }
+
+  .analog-clock {
+    width: min(calc(40vh * var(--analog-scale, 1)), calc(60vw * var(--analog-scale, 1)));
+  }
+
+  body[data-style="analog"] .time-display {
+    font-size: min(var(--clock-font-size, 40px), 7vw, 8vh);
+  }
+
+  body[data-style="analog"] .info-bar {
+    font-size: clamp(0.72rem, 2vw, 0.95rem);
+  }
+}
+
+/* 极矮屏幕（高度 ≤ 500px）：表盘压缩到极限，数字时间与信息条紧凑排列 */
+@media (max-height: 500px) {
+  body[data-style="analog"] #clock-app {
+    gap: 4px;
+  }
+
+  .analog-clock {
+    width: min(calc(34vh * var(--analog-scale, 1)), calc(50vw * var(--analog-scale, 1)));
+  }
+
+  body[data-style="analog"] .time-display {
+    font-size: min(var(--clock-font-size, 40px), 6vw, 7vh);
+  }
+
+  body[data-style="analog"] .info-bar {
+    font-size: 0.7rem;
+  }
+}
+
+/* 隐藏滚动条但保持可滚动（设置面板内） */
+.settings-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-body::-webkit-scrollbar-thumb {
+  background: var(--control-active);
+  border-radius: 3px;
+}
+
+.settings-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ==========================================================================
+   8. 无障碍：减少动画偏好
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* 加载指示器属于功能性动画（提示“正在加载”），需保持旋转，不受减少动画偏好影响 */
+  .font-toast[data-status="loading"] .font-toast-icon {
+    animation-duration: 0.8s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* 深色模式下滚动条 */
+body[data-theme="dark"] .settings-body::-webkit-scrollbar-thumb {
+  background: #3a3e5c;
+}
+
+/* ==========================================================================
+   9. 字体加载状态提示（toast）
+   ========================================================================== */
+
+.font-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100; /* 高于设置面板(80)与遮罩(70) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, 92vw);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-color);
+  animation: font-toast-in 0.25s ease;
+  pointer-events: auto;
+}
+
+.font-toast[hidden] {
+  display: none;
+}
+
+@keyframes font-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.font-toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.font-toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 加载中：CSS 圆环 spinner（替代静态图标）——显式 from/to 保证所有浏览器
+   从 0° 连续旋转到 360°（仅写 to 时起止矩阵相同，部分浏览器插值后视觉不动） */
+.font-toast[data-status="loading"] .font-toast-icon {
+  border: 2.5px solid rgba(var(--accent-rgb), 0.25);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: font-toast-spin 0.8s linear infinite;
+}
+
+@keyframes font-toast-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 手动刷新按钮（字体已下载但页面未自动更新时显示） */
+.font-toast-refresh {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-color);
+  border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent-color);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.font-toast-refresh:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.font-toast-refresh:active {
+  transform: scale(0.97);
+}
+
+/* 小屏下提示条收窄 */
+@media (max-width: 480px) {
+  .font-toast {
+    top: 10px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+  }
+
+  .font-toast-refresh {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   配色预设（color preset）—— 通过 body[data-palette] 属性驱动
+   ==========================================================================
+   说明：
+   - 预设规则放在文件末尾，选择器具体性与 body[data-style="neon"] 相同、
+     声明更靠后，因此可覆盖风格的硬编码主题变量；深色组选择器
+     body[data-palette="xxx"][data-theme="dark"] 具体性更高，自动联动浅/深模式。
+   - 切换配色只需设置 document.body.dataset.palette（js/palette.js），
+     无需刷新页面，所有使用 var(--xxx) 的元素实时更新。
+   - default 预设不在此定义，沿用 body 默认主题变量。
+   -------------------------------------------------------------------------- */
+
+/* ---------- 海洋（ocean）：青蓝冷色调 ---------- */
+body[data-palette="ocean"] {
+  color-scheme: light;
+  --bg-color: #eef4f6;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #ffffff 0%, #e2edf1 100%);
+  --text-color: #0f1a24;
+  --text-secondary: #4a6b7a;
+  --text-tertiary: #7d97a3;
+  --accent-color: #0e9fbd;
+  --accent-rgb: 14, 159, 189;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(15, 26, 36, 0.08);
+  --panel-shadow: 0 24px 60px rgba(10, 40, 52, 0.18);
+  --control-bg: #e0ebef;
+  --control-hover: #d4e3e9;
+  --control-active: #c7dbe3;
+  --divider: rgba(15, 26, 36, 0.08);
+  --neon-glow: rgba(14, 159, 189, 0.35);
+}
+body[data-palette="ocean"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #0a141c;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #13232d 0%, #081219 100%);
+  --text-color: #d9ecf4;
+  --text-secondary: #8fb3c2;
+  --text-tertiary: #55707e;
+  --accent-color: #35c3e2;
+  --accent-rgb: 53, 195, 226;
+  --panel-bg: rgba(14, 26, 36, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #16262f;
+  --control-hover: #1c303b;
+  --control-active: #223a46;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(53, 195, 226, 0.45);
+}
+
+/* ---------- 落日（sunset）：橙紫暖色调 ---------- */
+body[data-palette="sunset"] {
+  color-scheme: light;
+  --bg-color: #faf3ee;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fff8f1 0%, #f5e7da 100%);
+  --text-color: #2a1810;
+  --text-secondary: #8a5a3f;
+  --text-tertiary: #b08a72;
+  --accent-color: #e8590c;
+  --accent-rgb: 232, 89, 12;
+  --panel-bg: rgba(255, 250, 245, 0.92);
+  --panel-border: rgba(42, 24, 16, 0.08);
+  --panel-shadow: 0 24px 60px rgba(120, 52, 16, 0.16);
+  --control-bg: #f3e5d8;
+  --control-hover: #ecd9c6;
+  --control-active: #e4cdb4;
+  --divider: rgba(42, 24, 16, 0.08);
+  --neon-glow: rgba(232, 89, 12, 0.35);
+}
+body[data-palette="sunset"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #1a0e0a;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #2c1a10 0%, #140a06 100%);
+  --text-color: #ffe9d9;
+  --text-secondary: #d9a07a;
+  --text-tertiary: #8f5f42;
+  --accent-color: #ff7a3c;
+  --accent-rgb: 255, 122, 60;
+  --panel-bg: rgba(42, 24, 14, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #311e12;
+  --control-hover: #3a2517;
+  --control-active: #452b1c;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(255, 122, 60, 0.45);
+}
+
+/* ---------- 森林（forest）：墨绿自然色 ---------- */
+body[data-palette="forest"] {
+  color-scheme: light;
+  --bg-color: #f0f4ee;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fbfdfa 0%, #e4ece0 100%);
+  --text-color: #16241a;
+  --text-secondary: #4d6b55;
+  --text-tertiary: #7d9683;
+  --accent-color: #2f9e44;
+  --accent-rgb: 47, 158, 68;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(22, 36, 26, 0.08);
+  --panel-shadow: 0 24px 60px rgba(22, 58, 32, 0.16);
+  --control-bg: #e1e9de;
+  --control-hover: #d4e0d0;
+  --control-active: #c7d7c2;
+  --divider: rgba(22, 36, 26, 0.08);
+  --neon-glow: rgba(47, 158, 68, 0.35);
+}
+body[data-palette="forest"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #0c150e;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #15251a 0%, #08120b 100%);
+  --text-color: #dff0e3;
+  --text-secondary: #93b59c;
+  --text-tertiary: #5a7a63;
+  --accent-color: #51cf66;
+  --accent-rgb: 81, 207, 102;
+  --panel-bg: rgba(14, 28, 18, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #16261b;
+  --control-hover: #1c3022;
+  --control-active: #223a29;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(81, 207, 102, 0.45);
+}
+
+/* ---------- 樱花（sakura）：粉紫浪漫色 ---------- */
+body[data-palette="sakura"] {
+  color-scheme: light;
+  --bg-color: #faf2f6;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fff8fb 0%, #f4e5ee 100%);
+  --text-color: #2a1524;
+  --text-secondary: #8a5f7c;
+  --text-tertiary: #b28ca6;
+  --accent-color: #d6336c;
+  --accent-rgb: 214, 51, 108;
+  --panel-bg: rgba(255, 250, 253, 0.92);
+  --panel-border: rgba(42, 21, 36, 0.08);
+  --panel-shadow: 0 24px 60px rgba(120, 30, 80, 0.16);
+  --control-bg: #f3e5ed;
+  --control-hover: #ecd9e3;
+  --control-active: #e5ccd9;
+  --divider: rgba(42, 21, 36, 0.08);
+  --neon-glow: rgba(214, 51, 108, 0.35);
+}
+body[data-palette="sakura"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #180e16;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #291a24 0%, #120a10 100%);
+  --text-color: #fce6f1;
+  --text-secondary: #d69abf;
+  --text-tertiary: #8f5f7e;
+  --accent-color: #f06595;
+  --accent-rgb: 240, 101, 149;
+  --panel-bg: rgba(40, 22, 34, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #2d1b27;
+  --control-hover: #36202e;
+  --control-active: #402636;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(240, 101, 149, 0.45);
+}
+
+/* ---------- 石墨（graphite）：黑白灰极简 ---------- */
+body[data-palette="graphite"] {
+  color-scheme: light;
+  --bg-color: #f5f5f5;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fdfdfd 0%, #ebebeb 100%);
+  --text-color: #161616;
+  --text-secondary: #5f5f5f;
+  --text-tertiary: #8f8f8f;
+  --accent-color: #4d4d4d;
+  --accent-rgb: 77, 77, 77;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(22, 22, 22, 0.08);
+  --panel-shadow: 0 24px 60px rgba(22, 22, 22, 0.16);
+  --control-bg: #e7e7e7;
+  --control-hover: #dddddd;
+  --control-active: #d3d3d3;
+  --divider: rgba(22, 22, 22, 0.08);
+  --neon-glow: rgba(77, 77, 77, 0.35);
+}
+body[data-palette="graphite"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #101010;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #1b1b1b 0%, #0a0a0a 100%);
+  --text-color: #f0f0f0;
+  --text-secondary: #ababab;
+  --text-tertiary: #6b6b6b;
+  --accent-color: #c9c9c9;
+  --accent-rgb: 201, 201, 201;
+  --panel-bg: rgba(26, 26, 26, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #1e1e1e;
+  --control-hover: #262626;
+  --control-active: #2e2e2e;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(201, 201, 201, 0.45);
+}
+
+/* ---------- 紫晶（amethyst）：紫色系 ---------- */
+body[data-palette="amethyst"] {
+  color-scheme: light;
+  --bg-color: #f3f1fa;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fbfaff 0%, #e7e3f5 100%);
+  --text-color: #1e1830;
+  --text-secondary: #61599a;
+  --text-tertiary: #8f87bd;
+  --accent-color: #7048e8;
+  --accent-rgb: 112, 72, 232;
+  --panel-bg: rgba(255, 255, 255, 0.92);
+  --panel-border: rgba(30, 24, 48, 0.08);
+  --panel-shadow: 0 24px 60px rgba(52, 34, 120, 0.18);
+  --control-bg: #e6e2f2;
+  --control-hover: #dad4ec;
+  --control-active: #cec6e5;
+  --divider: rgba(30, 24, 48, 0.08);
+  --neon-glow: rgba(112, 72, 232, 0.35);
+}
+body[data-palette="amethyst"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #100d1e;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #1e1930 0%, #0b0916 100%);
+  --text-color: #e8e3fb;
+  --text-secondary: #a79fdd;
+  --text-tertiary: #6d65a0;
+  --accent-color: #9775fa;
+  --accent-rgb: 151, 117, 250;
+  --panel-bg: rgba(26, 22, 46, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #221c3a;
+  --control-hover: #2a2347;
+  --control-active: #322a54;
+  --divider: rgba(255, 255, 255, 0.08);
+  --neon-glow: rgba(151, 117, 250, 0.45);
+}

@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f0f1a">
+  <title>全屏时钟</title>
+
+  <!-- 字体加载（由 js/fonts.js 统一管理：优先使用本地 IndexedDB 缓存，未命中才请求网络；
+       网络失败自动回退到系统字体栈） -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-style="minimal" data-theme="light" data-theme-mode="auto">
+
+  <main id="clock-app">
+
+    <!-- ============ 模拟表盘（仅 analog 风格显示） ============ -->
+    <div class="analog-container" id="analog-container">
+      <svg class="analog-clock" id="analog-clock" viewBox="0 0 400 400" role="img" aria-label="模拟时钟">
+        <!-- 主题色经 color 属性（var 兼容所有浏览器）+ currentColor 传入 SVG，
+             规避部分浏览器在 SVG fill/stroke 中直接使用 var() 失效导致文字/刻度不可读 -->
+        <circle cx="200" cy="200" r="192" class="clock-face-outer" style="color: var(--bg-color)"/>
+        <circle cx="200" cy="200" r="182" class="clock-face-inner" style="color: var(--bg-color)"/>
+        <g id="minute-ticks" style="color: var(--text-tertiary)"></g>
+        <g id="hour-markers"></g>
+        <g id="hour-numbers"></g>
+        <!-- 表针（初始指向12点，由JS驱动旋转） -->
+        <line x1="200" y1="224" x2="200" y2="118" class="hour-hand"   id="hour-hand"/>
+        <line x1="200" y1="228" x2="200" y2="88"  class="minute-hand" id="minute-hand"/>
+        <line x1="200" y1="238" x2="200" y2="66"  class="second-hand" id="second-hand" style="color: var(--accent-color)"/>
+        <circle cx="200" cy="200" r="11" class="clock-center-outer" style="color: var(--bg-color)"/>
+        <circle cx="200" cy="200" r="5"  class="clock-center-inner" style="color: var(--accent-color)"/>
+      </svg>
+    </div>
+
+    <!-- ============ 数字时间（minimal / neon 主显示，analog 辅显示） ============ -->
+    <div class="digital-container" id="digital-container">
+      <div class="time-display" id="time-display">
+        <span class="hours" id="hours"><span class="digit">0</span><span class="digit">0</span></span>
+        <span class="colon" id="colon">:</span>
+        <span class="minutes" id="minutes"><span class="digit">0</span><span class="digit">0</span></span>
+        <!-- 秒数与 AM/PM 组成整体单元：AM/PM 置于秒数上方（12 小时制时显示） -->
+        <span class="seconds-wrapper" id="seconds-wrapper">
+          <span class="ampm" id="ampm" hidden></span>
+          <span class="seconds" id="seconds"><span class="digit">0</span><span class="digit">0</span></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- ============ 日期与天气信息条 ============ -->
+    <div class="info-bar" id="info-bar">
+      <span class="date-display" id="date-display">--</span>
+      <span class="info-separator" aria-hidden="true"></span>
+      <span class="weather-display" id="weather-display">
+        <span class="weather-icon" id="weather-icon"></span>
+        <span class="weather-text" id="weather-text">天气获取中…</span>
+      </span>
+    </div>
+
+  </main>
+
+  <!-- ============ 设置按钮 ============ -->
+  <button id="settings-btn" class="settings-btn" aria-label="打开设置" title="设置">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+
+  <!-- ============ 设置面板 ============ -->
+  <div id="settings-overlay" class="settings-overlay" hidden></div>
+
+  <aside id="settings-panel" class="settings-panel" aria-label="设置面板">
+    <div class="settings-header">
+      <h2>⚙ 设置</h2>
+      <button id="close-settings" class="close-btn" aria-label="关闭设置">&times;</button>
+    </div>
+
+    <div class="settings-body">
+
+      <!-- 风格选择 -->
+      <section class="setting-group">
+        <h3>时钟风格</h3>
+        <select id="style-select" class="setting-select" aria-label="时钟风格">
+          <option value="minimal">◧ 极简风</option>
+          <option value="neon">◈ 霓虹风</option>
+          <option value="analog">◔ 模拟表盘</option>
+        </select>
+        <!-- 模拟表盘数字时间开关（仅 analog 风格下显示） -->
+        <label class="toggle-row" id="analog-digital-toggle-row" hidden>
+          <span class="toggle-text">模拟表盘显示数字时间</span>
+          <input type="checkbox" id="analog-digital-toggle" class="toggle-switch" checked>
+        </label>
+        <!-- 表盘尺寸缩放（仅 analog 风格下显示）：滑动条作为缩放系数，乘到 vh/vw 基础比例上 -->
+        <label class="setting-label" id="analog-scale-row" hidden>
+          <span class="label-text">表盘尺寸 <span class="slider-value" id="analog-scale-value">100%</span></span>
+          <input type="range" id="analog-scale-slider" class="setting-slider" min="50" max="200" step="5" value="100">
+        </label>
+      </section>
+
+        <!-- 配色预设（js/palette.js 动态填充选项；颜色变量见 styles.css 末尾
+             body[data-palette] 规则，浅/深模式自动联动） -->
+        <section class="setting-group">
+          <h3>配色预设</h3>
+          <select id="palette-select" class="setting-select" aria-label="配色预设"></select>
+          <p class="setting-hint">选择后立即应用到整个界面并自动保存；深色 / 浅色模式下分别匹配对应的配色。</p>
+        </section>
+
+        <!-- 时间格式 -->
+      <section class="setting-group">
+        <h3>时间格式</h3>
+        <div class="toggle-group" role="radiogroup" aria-label="时间格式">
+          <button class="format-option" data-format="24" role="radio" aria-checked="true">24 小时制</button>
+          <button class="format-option" data-format="12" role="radio" aria-checked="false">12 小时制</button>
+        </div>
+        <label class="toggle-row">
+          <span class="toggle-text">显示秒数</span>
+          <input type="checkbox" id="show-seconds-toggle" class="toggle-switch" checked>
+        </label>
+        <label class="toggle-row">
+          <span class="toggle-text">显示 AM/PM</span>
+          <input type="checkbox" id="show-ampm-toggle" class="toggle-switch" checked>
+        </label>
+        <p class="setting-hint">「显示 AM/PM」仅 12 小时制下生效；关闭秒数或 AM/PM 后时/分显示不受影响。</p>
+      </section>
+
+      <!-- 主题模式 -->
+      <section class="setting-group">
+        <h3>深色 / 浅色模式</h3>
+        <div class="toggle-group" role="radiogroup" aria-label="主题模式">
+          <button class="theme-option" data-mode="auto" role="radio" aria-checked="true">🌗 自动</button>
+          <button class="theme-option" data-mode="light" role="radio" aria-checked="false">☀ 浅色</button>
+          <button class="theme-option" data-mode="dark" role="radio" aria-checked="false">🌙 深色</button>
+        </div>
+        <p class="setting-hint" id="auto-theme-hint">自动模式：6:00 – 18:00 浅色，其余时间深色</p>
+      </section>
+
+      <!-- 字体设置（按风格独立） -->
+      <section class="setting-group" id="font-settings">
+        <h3>字体设置 <span class="current-style-label" id="current-style-label"></span></h3>
+        <label class="setting-label">
+          <span class="label-text">字体</span>
+          <select id="font-family-select" class="setting-select"></select>
+        </label>
+        <label class="setting-label">
+          <span class="label-text">字号</span>
+          <input type="range" id="font-size-slider" class="setting-slider" min="24" max="160" step="2" value="80">
+        </label>
+        <label class="setting-label">
+          <span class="label-text">字重</span>
+          <input type="range" id="font-weight-slider" class="setting-slider" min="100" max="900" step="100" value="400">
+        </label>
+        <label class="setting-label">
+          <span class="label-text">数字间距</span>
+          <input type="range" id="digit-gap-slider" class="setting-slider" min="-0.6" max="0.8" step="0.05" value="0">
+        </label>
+        <button id="clear-font-cache-btn" class="action-btn">🗑 清空字体缓存</button>
+        <p class="setting-hint" id="font-cache-hint">缓存可加速字体加载，无需联网即可使用。如遇字体显示异常可清空后重新加载。</p>
+      </section>
+
+      <!-- 时间同步（网络校准） -->
+      <section class="setting-group">
+        <h3>时间同步</h3>
+        <label class="toggle-row">
+          <span class="toggle-text">自动校准网络时间</span>
+          <input type="checkbox" id="auto-sync-toggle" class="toggle-switch" checked>
+        </label>
+        <p class="sync-status" id="sync-status">正在校准…</p>
+        <button id="resync-btn" class="action-btn">↻ 立即校准</button>
+        <p class="setting-hint">开启后自动从网络时间源校准（对齐 time.is 等网络时钟）；关闭则始终使用本地系统时间。</p>
+      </section>
+
+      <!-- 天气 -->
+      <section class="setting-group">
+        <h3>天气</h3>
+        <label class="setting-label">
+          <span class="label-text">数据源</span>
+          <select id="weather-source-select" class="setting-select" aria-label="天气数据源">
+            <option value="auto">自动（多源回退）</option>
+            <option value="amap">高德（中国区实况，需 API Key）</option>
+            <option value="ecmwf">ECMWF（Open-Meteo 模型）</option>
+            <option value="gfs">GFS（Open-Meteo 模型）</option>
+            <option value="cma">CMA 中国气象局（可能不稳定）</option>
+            <option value="wttr">wttr.in（无需 Key）</option>
+          </select>
+        </label>
+        <p class="setting-hint">自动模式按 高德 → ECMWF → GFS → wttr.in 顺序回退，直到成功；指定单一数据源时只使用该源。</p>
+        <p class="setting-hint" id="cma-warning" hidden>⚠ CMA 数据源（中国气象局 GRAPES 全球模型）可能因服务超负荷而不稳定，如遇异常请切换其他数据源。</p>
+        <label class="setting-label">
+          <span class="label-text">高德 API Key（可选）</span>
+          <input type="password" id="amap-key" class="setting-input" placeholder="粘贴高德 Web 服务 Key" autocomplete="off" spellcheck="false">
+        </label>
+        <p class="setting-hint" id="amap-key-hint">选择「高德」数据源时必须填写此 Key；Key 仅保存在本机浏览器。</p>
+        <p class="weather-status" id="weather-status">尚未获取天气数据</p>
+        <button id="refresh-weather" class="action-btn">↻ 刷新天气</button>
+      </section>
+
+      <!-- 显示 -->
+      <section class="setting-group">
+        <h3>显示</h3>
+        <div class="zoom-control">
+          <span class="label-text">全局缩放 <span class="slider-value" id="zoom-value">100%</span></span>
+          <div class="zoom-buttons">
+            <button id="zoom-out-btn" class="zoom-btn" aria-label="缩小" title="缩小">−</button>
+            <button id="zoom-in-btn" class="zoom-btn" aria-label="放大" title="放大">＋</button>
+          </div>
+        </div>
+        <button id="fullscreen-btn" class="action-btn">⛶ 切换全屏</button>
+      </section>
+
+    </div>
+
+    <div class="settings-footer">
+      <p class="footer-note">偏好设置会自动保存到本地</p>
+    </div>
+  </aside>
+
+  <!-- 字体加载状态提示（js/fontToast.js 驱动：加载中 / 完成 / 失败 / 手动刷新） -->
+  <div id="font-toast" class="font-toast" role="status" aria-live="polite" hidden>
+    <span id="font-toast-icon" class="font-toast-icon"></span>
+    <span id="font-toast-text" class="font-toast-text"></span>
+    <button id="font-toast-refresh" class="font-toast-refresh" hidden>⟳ 手动刷新</button>
+  </div>
+
+  <!-- 模块化脚本：经典脚本 + 全局命名空间（window.ClockXxx），无需本地服务器/Node，
+       双击 HTML（file:// 协议）即可运行。加载顺序即依赖顺序（defer 保证按文档序执行）：
+       utils → config → dom → state → timeSync → theme → clock → analogClock →
+       fonts → fontToast → style → weather → settings → main -->
+  <script src="js/utils.js" defer></script>
+  <script src="js/config.js" defer></script>
+  <script src="js/dom.js" defer></script>
+  <script src="js/state.js" defer></script>
+  <script src="js/timeSync.js" defer></script>
+  <script src="js/theme.js" defer></script>
+  <script src="js/clock.js" defer></script>
+  <script src="js/analogClock.js" defer></script>
+  <script src="js/fonts.js" defer></script>
+  <script src="js/fontToast.js" defer></script>
+  <script src="js/style.js" defer></script>
+  <script src="js/palette.js" defer></script>
+  <script src="js/weather.js" defer></script>
+  <script src="js/settings.js" defer></script>
+  <script src="js/main.js" defer></script>
+</body>
+</html>
