@@ -68,6 +68,9 @@ function tick() {
   // 负间距层叠时左侧字符始终盖住右侧字符
   applyDigitStack();
 
+  // 信息条贴靠主视觉下方（跟随字号/表盘尺寸动态变化）
+  layoutInfoBar();
+
   // 自动主题：每分钟检查一次即可（秒变化不影响主题）
   if (state.themeMode === 'auto') {
     const minKey = now.getHours() * 60 + now.getMinutes();
@@ -75,6 +78,35 @@ function tick() {
       lastThemeCheckMinute = minKey;
       applyAutoTheme(now);
     }
+  }
+}
+
+/** 信息条贴靠主视觉：计算主视觉（数字时间/表盘）底部位置写入 --main-bottom，
+    CSS 中信息条 top = --main-bottom + --clock-gap，实现贴靠而非固定底部。
+    - minimal/neon：贴数字时间底部
+    - analog + 显示数字时间：贴数字时间底部
+    - analog + 不显示数字时间：贴表盘底部 */
+function layoutInfoBar() {
+  const infoBar = $('#info-bar');
+  if (!infoBar) return;
+  const td = document.querySelector('.time-display');
+  const ac = document.querySelector('.analog-clock');
+  // zoom 因子：getBoundingClientRect 返回视觉坐标（已含 CSS zoom 缩放），
+  // 而 CSS top 是布局坐标（会被 zoom 再次缩放）→ 除以 zoom 因子回到布局坐标，
+  // 保证信息栏在任意全局缩放下都精确贴靠主视觉、不溢出屏幕
+  const zoom = (state.globalZoom || 100) / 100;
+  let bottom = 0;
+  if (state.style === 'analog') {
+    if (state.analogDigital && td) {
+      const r = td.getBoundingClientRect();
+      if (r.height > 0) bottom = r.bottom / zoom;
+    }
+    if (!bottom && ac) bottom = ac.getBoundingClientRect().bottom / zoom;
+  } else if (td) {
+    bottom = td.getBoundingClientRect().bottom / zoom;
+  }
+  if (bottom > 0) {
+    document.documentElement.style.setProperty('--main-bottom', `${bottom}px`);
   }
 }
 

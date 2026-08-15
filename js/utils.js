@@ -26,18 +26,22 @@ function trackAbort(signal) {
   signal.addEventListener('abort', () => pendingAborters.delete(signal), { once: true });
 }
 
-/** AbortSignal.timeout 的兼容封装（超时自动中断，且纳入统一管理） */
+/** AbortSignal.timeout 的兼容封装（超时自动中断，且纳入统一管理）。
+    旧浏览器不支持 AbortController/AbortSignal 时返回 undefined（fetch 不带 signal、
+    无超时但可正常工作），避免 new AbortController() 抛异常导致天气/时间校准失效 */
 function withTimeout(ms) {
+  if (typeof AbortController === 'undefined') return undefined;
   try {
-    const signal = AbortSignal.timeout(ms);
-    trackAbort(signal);
-    return signal;
-  } catch (e) {
-    const ctrl = new AbortController();
-    setTimeout(() => ctrl.abort(), ms);
-    trackAbort(ctrl.signal);
-    return ctrl.signal;
-  }
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      const signal = AbortSignal.timeout(ms);
+      trackAbort(signal);
+      return signal;
+    }
+  } catch (e) { /* 回退到 AbortController */ }
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), ms);
+  trackAbort(ctrl.signal);
+  return ctrl.signal;
 }
 
 /** 中断所有进行中的网络请求（天气/地理编码等） */

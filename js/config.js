@@ -44,7 +44,7 @@ const STYLE_CONFIGS = {
     defaultSize: 92,
     defaultWeight: 200,
     minSize: 32,
-    maxSize: 180,
+    maxSize: 360,
   },
   neon: {
     label: '霓虹',
@@ -52,7 +52,7 @@ const STYLE_CONFIGS = {
     defaultSize: 84,
     defaultWeight: 700,
     minSize: 32,
-    maxSize: 170,
+    maxSize: 340,
   },
   analog: {
     label: '表盘',

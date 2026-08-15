@@ -108,6 +108,14 @@ function applyFontSettings(style = state.style) {
   const colonGap = Math.min(0.6, Math.max(0.2, 0.3 + gap * 0.25));
   document.documentElement.style.setProperty('--clock-colon-gap', `${colonGap}em`);
 
+  // 秒数+AM/PM 组合距离分钟数的间距：同样随数字间距联动（方向一致）——
+  // 数字拉开（gap 增大）时秒数组合同步外移，数字层叠（gap 为负）时收敛；
+  // 基础距离 0.055em（gap=0 时约 5px @ 92px 主字号，更贴近分钟数），
+  // clamp 下限 0.03em 保证秒数与分钟右缘始终有正间隙、永不被覆盖，
+  // 上限 0.5em 防止极端 gap 下偏离过远。
+  const secondsGap = Math.min(0.5, Math.max(0.03, 0.055 + gap * 0.25));
+  document.documentElement.style.setProperty('--clock-seconds-gap', `${secondsGap}em`);
+
   $('#current-style-label').textContent = `（${cfg.label}）`;
 
   // 字体/字号变化后重新测量数字槽位宽度

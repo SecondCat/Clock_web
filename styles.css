@@ -84,7 +84,8 @@ body[data-theme="dark"] {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(12px, 3vh, 36px);
+  --clock-gap: clamp(12px, 3vh, 36px);
+  gap: var(--clock-gap);
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
            max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   /* 关键元素不溢出 */
@@ -95,12 +96,14 @@ body[data-theme="dark"] {
 /* ---------- 3. 数字时间 ---------- */
 
 .digital-container {
+  /* 数字时间作为主视觉：绝对定位铺满屏幕并居中 → 严格对齐 X/Y 轴中心 */
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   min-height: 0;
-  flex-shrink: 0;
 }
 
 .time-display {
@@ -197,14 +200,15 @@ body[data-theme="dark"] {
 .time-display .seconds-wrapper {
   position: absolute;
   top: 50%;
-  left: calc(50% + var(--clock-colon-gap, 0.3em) + 0.18em + 2 * var(--clock-digit-width, 0.62em) + var(--clock-digit-gap, 0em));
+  /* 距离分钟数的间距用 --clock-seconds-gap（随数字间距滑动条联动，见 style.js） */
+  left: calc(50% + var(--clock-colon-gap, 0.3em) + var(--clock-seconds-gap, 0.18em) + 2 * var(--clock-digit-width, 0.62em) + var(--clock-digit-gap, 0em));
   /* 固定宽度 = 2 个数字槽位宽度（× 秒数缩放系数）：即使秒数隐藏（display:none）
      wrapper 宽度仍保持恒定，AM/PM 的 left:50% 水平居中基准不随秒数开关漂移。
      --clock-digit-width 为 em（相对主字号），--seconds-scale 为数字，相乘得长度 */
   width: calc(2 * var(--clock-digit-width, 0.62em) * var(--seconds-scale, 0.32));
-  font-weight: 300;
+  font-weight: 400;
   color: var(--text-secondary);
-  opacity: 0.85;
+  opacity: 1;
   /* 垂直：小字行盒中心 = 容器中线 + (--seconds-shift × --seconds-scale)，
      等效原 align-self:center + translateY(0.28em)。用 margin-top 而非 transform ——
      transform 会创建层叠上下文，使秒数无法与时/分数字按全局 z-index
@@ -253,11 +257,10 @@ body[data-theme="dark"] {
   bottom: calc(100% + 0.18em);
   left: 50%;
   transform: translateX(-50%);
-  /* 相对主字号：0.32em × 0.75 = 0.24em（随 --seconds-font-size 联动 ——
-     不能用 --seconds-scale 数字相乘：font-size 不接受无单位 calc 结果，
-     会被浏览器丢弃回退继承值，导致 AM/PM 与主字号同大、覆盖分钟数字） */
-  font-size: calc(var(--seconds-font-size, 0.32em) * 0.75);
-  font-weight: 500;
+  /* 字号与字重均与秒数一致（--seconds-font-size + font-weight 400），
+     保证 AM/PM 与秒数在视觉上属于同一单元 */
+  font-size: var(--seconds-font-size, 0.28em);
+  font-weight: 400;
   color: var(--text-secondary);
   letter-spacing: 0.08em;
   white-space: nowrap;
@@ -275,6 +278,13 @@ body[data-show-seconds="off"] .time-display .seconds {
 /* ---------- 4. 信息条（日期 + 天气） ---------- */
 
 .info-bar {
+  /* 贴靠在主视觉（数字时间/表盘）下方：top 由 JS 计算 --main-bottom（主视觉
+     底部相对视口的位置）+ --clock-gap（间隙），水平居中 —— 不固定底部，
+     随主视觉高度（字号/表盘尺寸）动态跟随 */
+  position: absolute;
+  top: calc(var(--main-bottom, 50%) + var(--clock-gap, 32px));
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -286,28 +296,16 @@ body[data-show-seconds="off"] .time-display .seconds {
   font-weight: 300;
   letter-spacing: 0.04em;
   white-space: nowrap;
-  max-width: 96vw;
-  flex-wrap: wrap;
+  /* 宽度不限制（不换行、不溢出）；水平居中 + 不 wrap */
+  max-width: none;
+  flex-wrap: nowrap;
   text-align: center;
-  flex-shrink: 0;
 }
 
-.info-separator {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
-  flex-shrink: 0;
-  /* 信息条 flex 已 align-items:center —— 圆点天然处于行盒中心，与日期/天气文字
-     框中心精确对齐；不加任何 transform 偏移（此前 translateY 下移导致圆点低于文字） */
-}
-
-/* 日期/天气显示开关：关闭日期或天气时，对应元素与分隔符一起隐藏；
+/* 日期/天气显示开关：关闭日期或天气时隐藏对应元素；
    info-bar 为 flex justify-content:center，剩余元素自动居中 */
 body[data-show-date="off"] .date-display,
-body[data-show-weather="off"] .weather-display,
-body[data-show-date="off"] .info-separator,
-body[data-show-weather="off"] .info-separator {
+body[data-show-weather="off"] .weather-display {
   display: none;
 }
 
@@ -397,11 +395,6 @@ body[data-style="neon"] .info-bar {
   text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.35);
 }
 
-body[data-style="neon"] .info-separator {
-  background: rgba(var(--accent-rgb), 0.4);
-  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6);
-}
-
 /* ---------- 霓虹风 · 浅色模式适配 ----------
    neon 深色规则（上方 body[data-style="neon"]）默认始终深色底；当用户选择
    浅色/自动模式（白天）时，默认「星蓝」预设需要可读的浅色霓虹配色：
@@ -451,10 +444,6 @@ body[data-style="neon"][data-theme="light"] .info-bar {
   text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.18);
 }
 
-body[data-style="neon"][data-theme="light"] .info-separator {
-  box-shadow: 0 0 4px rgba(var(--accent-rgb), 0.35);
-}
-
 body[data-style="neon"][data-theme="light"] #clock-app::before {
   background:
     radial-gradient(circle at 20% 30%, rgba(var(--accent-rgb), 0.05) 0%, transparent 40%),
@@ -488,7 +477,7 @@ body[data-style="neon"] #clock-app::before {
 }
 
 #clock-app > * {
-  position: relative;
+  /* 仅保证子元素在背景层之上（position 由各元素自行定义：absolute 居中/底部） */
   z-index: 1;
 }
 
@@ -501,22 +490,29 @@ body[data-style="neon"] #clock-app::before {
    风格 3：经典模拟表盘（analog）
    ========================================================================== */
 
-/* 模拟表盘容器：不吸收额外空间（flex-grow: 0），高度随表盘内容收缩，
-   表盘、数字时间、信息条作为整体在 #clock-app 内居中 —— 避免 flex:1 时
-   表盘在剩余空间内垂直居中导致表盘下方到数字时间/天气出现过大的留白。
-   保留 flex-shrink: 1 使极端缩放/低分辨率下容器可收缩、表盘按 max-height 收敛 */
+/* 模拟表盘容器：analog 风格下作为主视觉，绝对定位铺满屏幕并居中 →
+   表盘严格对齐 X/Y 轴中心（数字时间在表盘下方、信息条在底部） */
 .analog-container {
   display: none;
   align-items: center;
   justify-content: center;
   width: 100%;
-  flex: 0 1 auto;
   min-height: 0;
   overflow: hidden;
 }
 
 body[data-style="analog"] .analog-container {
   display: flex;
+  position: absolute;
+  inset: 0;
+}
+
+/* analog 下数字时间不再居中，而是定位在表盘正下方（表盘半高 + gap） */
+body[data-style="analog"] .digital-container {
+  top: calc(50% + min(calc(26vh * var(--analog-scale, 1)), calc(35vw * var(--analog-scale, 1))) + var(--clock-gap));
+  bottom: auto;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .analog-clock {
@@ -822,10 +818,17 @@ body {
 }
 
 /* 风格选项卡内的「显示数字时间」开关：位于表盘尺寸滑动条下方，
-   底部留间距与下方「显示日期」开关保持与其他元素一致的间隔 */
+   间距由表盘尺寸 .setting-label 的 margin-bottom 提供 */
 #analog-digital-toggle-row {
   margin-top: 0;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+}
+
+/* 风格选项卡内的「显示日期」开关：始终显示，顶部留间距 ——
+   在 minimal/neon 下（表盘尺寸/显示数字时间均隐藏）它与风格下拉之间
+   的间距由此提供；在 analog 下它与上方「显示数字时间」开关的间距也由此提供 */
+#show-date-row {
+  margin-top: 14px;
 }
 
 .toggle-text {
@@ -1109,7 +1112,9 @@ body[data-theme="dark"] #cma-warning {
   list-style: none;
   max-height: 260px;
   overflow-y: auto;
-  background: var(--panel-bg);
+  /* 实色背景（不透明）：--panel-bg 是半透明 rgba，展开菜单会透出下层内容，
+     改用 --control-bg 实色保证菜单完全不透明 */
+  background: var(--control-bg);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   box-shadow: var(--panel-shadow);
@@ -1267,7 +1272,7 @@ body[data-style="neon"] .custom-select-trigger.open {
 /* --- 竖屏：数字时间纵向堆叠、字号适配 --- */
 @media (orientation: portrait) {
   #clock-app {
-    gap: clamp(10px, 3vh, 30px);
+    --clock-gap: clamp(10px, 3vh, 30px);
   }
 
   .time-display {
@@ -1293,7 +1298,7 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   #clock-app {
-    gap: 6px;
+    --clock-gap: 6px;
   }
 
   body[data-style="analog"] .time-display {
@@ -1319,28 +1324,20 @@ body[data-style="neon"] .custom-select-trigger.open {
     flex-direction: column;
     gap: 4px;
   }
-
-  .info-separator {
-    display: none;
-  }
 }
 
-/* 高度很矮的横屏：信息条紧凑 */
+/* 高度很矮的横屏：信息条紧凑（表盘尺寸仍由基础比例线性缩放，不在此限制） */
 @media (orientation: landscape) and (max-height: 380px) {
   .info-bar {
     font-size: min(var(--info-font-size, 16px), 2vw);
     gap: 8px;
-  }
-
-  .analog-container {
-    max-height: 40vh;
   }
 }
 
 /* 低分辨率屏幕（高度 ≤ 700px）：间距收紧，防止与文字重叠（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
 @media (max-height: 700px) {
   body[data-style="analog"] #clock-app {
-    gap: clamp(6px, 1.5vh, 16px);
+    --clock-gap: clamp(6px, 1.5vh, 16px);
   }
 
   body[data-style="analog"] .time-display {
@@ -1355,7 +1352,7 @@ body[data-style="neon"] .custom-select-trigger.open {
 /* 极矮屏幕（高度 ≤ 500px）：数字时间与信息条紧凑排列（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
 @media (max-height: 500px) {
   body[data-style="analog"] #clock-app {
-    gap: 4px;
+    --clock-gap: 4px;
   }
 
   body[data-style="analog"] .time-display {

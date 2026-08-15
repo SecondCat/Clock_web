@@ -418,9 +418,9 @@ function setupSettingsPanel() {
   // 全屏切换
   $('#fullscreen-btn').addEventListener('click', () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     } else {
-      document.exitFullscreen?.().catch(() => {});
+      if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
     }
   });
 

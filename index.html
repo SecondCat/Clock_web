@@ -55,10 +55,9 @@
     <!-- ============ 日期与天气信息条 ============ -->
     <div class="info-bar" id="info-bar">
       <span class="date-display" id="date-display">--</span>
-      <span class="info-separator" aria-hidden="true"></span>
       <span class="weather-display" id="weather-display">
-        <span class="weather-icon" id="weather-icon"></span>
         <span class="weather-text" id="weather-text">天气获取中…</span>
+        <span class="weather-icon" id="weather-icon"></span>
       </span>
     </div>
 
@@ -103,7 +102,7 @@
           <input type="checkbox" id="analog-digital-toggle" class="toggle-switch" checked>
         </label>
         <!-- 日期/天气显示与字号：所有风格通用，始终显示（不受风格影响） -->
-        <label class="toggle-row">
+        <label class="toggle-row" id="show-date-row">
           <span class="toggle-text">显示日期</span>
           <input type="checkbox" id="show-date-toggle" class="toggle-switch" checked>
         </label>

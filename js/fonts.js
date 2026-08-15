@@ -105,7 +105,7 @@ async function clearFontCache() {
     });
     return count;
   } catch (e) {
-    console.warn('[fonts] 清空缓存失败', e?.message || e);
+    console.warn('[fonts] 清空缓存失败', (e && e.message) || e);
     return 0;
   }
 }
@@ -212,7 +212,7 @@ async function injectFaces(records) {
       await face.load();
       document.fonts.add(face);
     } catch (e) {
-      console.warn(`[fonts] 缓存字体注入失败：${rec.family} ${rec.weight}`, e?.message || e);
+      console.warn(`[fonts] 缓存字体注入失败：${rec.family} ${rec.weight}`, (e && e.message) || e);
     }
   }
 }
@@ -234,6 +234,9 @@ const FONT_STATUS = {
 let fontStatus = FONT_STATUS.IDLE;
 let currentFamily = null;
 let lastFromCache = false;
+
+// 已成功加载过的字体族（避免每次调整字号/字重都重复注入 FontFace 导致卡顿）
+const loadedFamilies = new Set();
 
 /** 查询当前字体加载状态（调试/外部轮询用） */
 function getFontLoadStatus() {
@@ -265,6 +268,7 @@ function setFontStatus(status, family, fromCache = false) {
 async function ensureFontLoaded(fontCssValue) {
   const family = extractFamily(fontCssValue);
   if (!family || !webFontByFamily.has(family)) return; // 系统字体/未知族名
+  if (loadedFamilies.has(family)) return; // 已加载过，跳过（避免重复注入导致卡顿）
   try {
     const cached = await dbGetByFamily(family);
     if (cached.length > 0) {
@@ -277,10 +281,11 @@ async function ensureFontLoaded(fontCssValue) {
       await loadAndCacheFamily(family);
       setFontStatus(FONT_STATUS.LOADED, family, false); // 来自网络
     }
+    loadedFamilies.add(family);
     notifyFontsLoaded();
   } catch (e) {
     setFontStatus(FONT_STATUS.FAILED, family);
-    console.warn(`[fonts] 字体「${family}」加载失败，已回退系统字体`, e?.message || e);
+    console.warn(`[fonts] 字体「${family}」加载失败，已回退系统字体`, (e && e.message) || e);
   }
 }
 
@@ -309,7 +314,7 @@ async function loadAndCacheFamily(family) {
         await injectFaces([rec]);
         okCount++;
       } catch (e) {
-        console.warn(`[fonts] 分片加载失败：${family} ${face.weight} ${(face.unicodeRange || '').slice(0, 24)}`, e?.message || e);
+        console.warn(`[fonts] 分片加载失败：${family} ${face.weight} ${(face.unicodeRange || '').slice(0, 24)}`, (e && e.message) || e);
       }
     }
     if (okCount === 0) throw new Error('全部字重分片加载失败');
