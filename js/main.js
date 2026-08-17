@@ -31,7 +31,7 @@ const {
   applyStyle,
 } = window.ClockStyle;
 const {
-  ensureFontLoaded, countCachedFaces, getFontLoadStatus, clearFontCache,
+  preloadAllFonts, countCachedFaces, getFontLoadStatus, clearFontCache,
 } = window.ClockFonts;
 const {
   setupFontToast,
@@ -140,8 +140,8 @@ function init() {
     setTimeout(applyDigitWidth, 100);
   });
 
-  // 字体本地缓存优先加载：启动即确保当前风格字体可用（未命中缓存才网络请求）
-  setTimeout(() => ensureFontLoaded(state.fonts[state.style]), 0);
+  // 打开页面后自动下载全部网络字体（每个字体族只尝试 1 次，失败不重试不中断其余）
+  setTimeout(() => preloadAllFonts(), 0);
 
   // 立即渲染一次时钟（避免空白闪烁）
   tick();

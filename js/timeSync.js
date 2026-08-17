@@ -11,7 +11,7 @@
 
 (() => {
 
-const { withTimeout, $ } = window.ClockUtils;
+const { fetchWithTimeout, $ } = window.ClockUtils;
 const { MAX_SYNC_JUMP } = window.ClockConfig;
 
 /* ---------- 校准状态 ---------- */
@@ -50,7 +50,7 @@ const TIME_SOURCES = [
     // 且由全球边缘节点应答（RTT 小、稳定），是理想的主时间源
     probe: async () => {
       const t0 = Date.now();
-      const res = await fetch('https://www.cloudflare.com/cdn-cgi/trace', { signal: withTimeout(6000) });
+      const res = await fetchWithTimeout('https://www.cloudflare.com/cdn-cgi/trace', {}, 6000);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const text = await res.text();
       const t1 = Date.now();
@@ -65,7 +65,7 @@ const TIME_SOURCES = [
     // 返回 { unixtime: 秒 }；部分网络可达，作为备用源（失败自动跳过）
     probe: async () => {
       const t0 = Date.now();
-      const res = await fetch('https://worldtimeapi.org/api/ip', { signal: withTimeout(6000) });
+      const res = await fetchWithTimeout('https://worldtimeapi.org/api/ip', {}, 6000);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const t1 = Date.now();

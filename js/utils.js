@@ -26,22 +26,33 @@ function trackAbort(signal) {
   signal.addEventListener('abort', () => pendingAborters.delete(signal), { once: true });
 }
 
-/** AbortSignal.timeout 的兼容封装（超时自动中断，且纳入统一管理）。
-    旧浏览器不支持 AbortController/AbortSignal 时返回 undefined（fetch 不带 signal、
-    无超时但可正常工作），避免 new AbortController() 抛异常导致天气/时间校准失效 */
+/** 超时自动中断信号封装（统一用 AbortController，不用 AbortSignal.timeout ——
+    后者 Chrome 103+ 才支持，且部分定制内核浏览器（如小米浏览器）存在实现 bug
+    会立即 abort 导致 fetch 失败）。旧浏览器连 AbortController 都没有时返回
+    undefined（fetch 不带 signal、无超时但可正常工作） */
 function withTimeout(ms) {
   if (typeof AbortController === 'undefined') return undefined;
-  try {
-    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-      const signal = AbortSignal.timeout(ms);
-      trackAbort(signal);
-      return signal;
-    }
-  } catch (e) { /* 回退到 AbortController */ }
   const ctrl = new AbortController();
   setTimeout(() => ctrl.abort(), ms);
   trackAbort(ctrl.signal);
   return ctrl.signal;
+}
+
+/** 带超时的 fetch：优先带 signal；若因 signal/AbortController 兼容问题（定制内核
+    浏览器，如小米浏览器）导致失败，自动重试一次不带 signal（无超时），
+    最大程度兼容旧/定制内核浏览器 */
+function fetchWithTimeout(url, options, ms) {
+  const signal = withTimeout(ms);
+  const doFetch = (withSig) => {
+    const opts = withSig && signal
+      ? Object.assign({}, options || {}, { signal })
+      : (options || {});
+    return fetch(url, opts);
+  };
+  return doFetch(true).catch((err) => {
+    if (signal) return doFetch(false); // 带 signal 失败 → 重试一次不带 signal
+    throw err;
+  });
 }
 
 /** 中断所有进行中的网络请求（天气/地理编码等） */
@@ -61,6 +72,6 @@ function formatDate(d) {
 }
 
 /* ---------- 命名空间导出 ---------- */
-window.ClockUtils = { $, pad, withTimeout, abortPendingRequests, formatDate };
+window.ClockUtils = { $, pad, withTimeout, fetchWithTimeout, abortPendingRequests, formatDate };
 
 })();

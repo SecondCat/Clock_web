@@ -235,8 +235,9 @@ let fontStatus = FONT_STATUS.IDLE;
 let currentFamily = null;
 let lastFromCache = false;
 
-// 已成功加载过的字体族（避免每次调整字号/字重都重复注入 FontFace 导致卡顿）
-const loadedFamilies = new Set();
+// 已尝试加载过的字体族（成功或失败都记录，确保每个字体族只尝试 1 次，
+// 避免调整字号/字重时重复注入 FontFace 导致卡顿）
+const attemptedFamilies = new Set();
 
 /** 查询当前字体加载状态（调试/外部轮询用） */
 function getFontLoadStatus() {
@@ -268,7 +269,8 @@ function setFontStatus(status, family, fromCache = false) {
 async function ensureFontLoaded(fontCssValue) {
   const family = extractFamily(fontCssValue);
   if (!family || !webFontByFamily.has(family)) return; // 系统字体/未知族名
-  if (loadedFamilies.has(family)) return; // 已加载过，跳过（避免重复注入导致卡顿）
+  if (attemptedFamilies.has(family)) return; // 已尝试过，跳过（只尝试 1 次）
+  attemptedFamilies.add(family); // 无论成败，标记已尝试
   try {
     const cached = await dbGetByFamily(family);
     if (cached.length > 0) {
@@ -281,12 +283,32 @@ async function ensureFontLoaded(fontCssValue) {
       await loadAndCacheFamily(family);
       setFontStatus(FONT_STATUS.LOADED, family, false); // 来自网络
     }
-    loadedFamilies.add(family);
     notifyFontsLoaded();
   } catch (e) {
     setFontStatus(FONT_STATUS.FAILED, family);
     console.warn(`[fonts] 字体「${family}」加载失败，已回退系统字体`, (e && e.message) || e);
   }
+}
+
+/** 页面打开后预加载全部网络字体（逐个尝试，每个只 1 次，失败不重试不中断其余）。
+    串行加载避免同时发起过多请求；已缓存/已尝试的跳过 */
+async function preloadAllFonts() {
+  for (const f of WEB_FONTS) {
+    const family = f.family;
+    if (attemptedFamilies.has(family)) continue;
+    attemptedFamilies.add(family);
+    try {
+      const cached = await dbGetByFamily(family);
+      if (cached.length > 0) {
+        await injectFaces(cached);
+      } else {
+        await loadAndCacheFamily(family);
+      }
+    } catch (e) {
+      console.warn(`[fonts] 字体「${family}」预加载失败`, (e && e.message) || e);
+    }
+  }
+  notifyFontsLoaded();
 }
 
 /** 网络加载一个字体族的所有分片并写入缓存（整体 120 秒超时；单个分片失败跳过，不中断整族） */
@@ -331,6 +353,7 @@ window.ClockFonts = {
   clearFontCache,
   getFontLoadStatus,
   ensureFontLoaded,
+  preloadAllFonts,
 };
 
 })();

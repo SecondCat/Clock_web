@@ -8,7 +8,7 @@
 
 (() => {
 
-const { withTimeout } = window.ClockUtils;
+const { withTimeout, fetchWithTimeout } = window.ClockUtils;
 const { els } = window.ClockDom;
 const { state } = window.ClockState;
 const {
@@ -144,9 +144,9 @@ const WEATHER_SOURCES = [
       if (!adcode && cached && cached.adcode) adcode = cached.adcode;
       if (!district && cached && cached.district) district = cached.district;
       if (!adcode) {
-        const reRes = await fetch(
+        const reRes = await fetchWithTimeout(
           `https://restapi.amap.com/v3/geocode/regeo?location=${lon},${lat}&key=${encodeURIComponent(key)}&extensions=base`,
-          { signal: withTimeout(8000) }
+          {}, 8000
         );
         if (!reRes.ok) throw new Error(`regeo HTTP ${reRes.status}`);
         const reData = await reRes.json();
@@ -166,7 +166,7 @@ const WEATHER_SOURCES = [
 
       // 2. 查询实况天气
       const url = `https://restapi.amap.com/v3/weather/weatherInfo?city=${encodeURIComponent(adcode)}&extensions=base&output=JSON&key=${encodeURIComponent(key)}`;
-      const res = await fetch(url, { signal: withTimeout(8000) });
+      const res = await fetchWithTimeout(url, {}, 8000);
       if (!res.ok) throw new Error(`weather HTTP ${res.status}`);
       const data = await res.json();
       if (data.status !== '1') throw new Error(`weather ${data.info || 'fail'}`);
@@ -191,7 +191,7 @@ const WEATHER_SOURCES = [
     fetch: (lat, lon) => {
       // ECMWF IFS 0.25° 全球模型：中国区覆盖好、精度高，与 CMA 无关
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&models=ecmwf_ifs025&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&timezone=auto`;
-      return fetch(url, { signal: withTimeout(8000) })
+      return fetchWithTimeout(url, {}, 8000)
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
@@ -218,7 +218,7 @@ const WEATHER_SOURCES = [
     fetch: (lat, lon) => {
       // NOAA GFS 全球模型：同样不依赖 CMA，作为 ECMWF 的备选
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&models=gfs_seamless&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&timezone=auto`;
-      return fetch(url, { signal: withTimeout(8000) })
+      return fetchWithTimeout(url, {}, 8000)
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
@@ -245,7 +245,7 @@ const WEATHER_SOURCES = [
     fetch: (lat, lon) => {
       // wttr.in：免费、无需 Key、CORS 开放（Access-Control-Allow-Origin: *），最后兜底
       const url = `https://wttr.in/${lat},${lon}?format=j1&lang=zh`;
-      return fetch(url, { signal: withTimeout(8000) })
+      return fetchWithTimeout(url, {}, 8000)
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
@@ -274,7 +274,7 @@ const WEATHER_SOURCES = [
       // ⚠ 此数据源可能不稳定（CMA 开放数据服务超负荷），由用户自行决定是否选用。
       // 排在 wttr.in 之后：自动模式下不参与回退链，仅用户手动选择时使用。
       const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&models=cma_grapes_global&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&timezone=auto`;
-      return fetch(url, { signal: withTimeout(8000) })
+      return fetchWithTimeout(url, {}, 8000)
         .then((res) => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
@@ -332,7 +332,7 @@ function friendlyError(e) {
 function fetchCityName(lat, lon) {
   // BigDataCloud 免费反向地理编码（无需 Key）
   const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=zh`;
-  return fetch(url, { signal: withTimeout(8000) })
+  return fetchWithTimeout(url, {}, 8000)
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
       if (!data) return null;
@@ -620,7 +620,7 @@ function renderWeatherFallback() {
 async function weatherByIP() {
   setWeatherStatus('尝试通过 IP 定位获取天气…');
   try {
-    const res = await fetch('https://ipapi.co/json/', { signal: withTimeout(8000) });
+    const res = await fetchWithTimeout('https://ipapi.co/json/', {}, 8000);
     if (!res.ok) throw new Error('ipapi failed');
     const data = await res.json();
     if (!data.latitude || !data.longitude) throw new Error('no coords');
