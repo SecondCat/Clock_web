@@ -290,8 +290,8 @@ body[data-show-seconds="off"] .time-display .seconds {
   justify-content: center;
   gap: clamp(10px, 2vw, 24px);
   /* 字号由设置面板「日期天气字号」滑动条控制（--info-font-size，px），
-     以 2.4vw 为上限保证窄屏下不溢出（窄屏自动缩小） */
-  font-size: min(var(--info-font-size, 16px), 2.4vw);
+     以 4vw 为上限：信息栏内容约 20 字符，4vw 让内容在窄屏下仍可读且不溢出 */
+  font-size: min(var(--info-font-size, 16px), 4vw);
   color: var(--text-secondary);
   font-weight: 300;
   letter-spacing: 0.04em;
@@ -614,7 +614,7 @@ body[data-style="analog"][data-analog-digital="off"] .digital-container {
 }
 
 body[data-style="analog"] .info-bar {
-  font-size: min(var(--info-font-size, 16px), 2.2vw);
+  font-size: min(var(--info-font-size, 16px), 4vw);
 }
 
 /* ==========================================================================
@@ -1284,7 +1284,7 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   .info-bar {
-    font-size: min(var(--info-font-size, 16px), 3vw);
+    font-size: min(var(--info-font-size, 16px), 4vw);
   }
 }
 
@@ -1310,7 +1310,7 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: min(var(--info-font-size, 16px), 2vw);
+    font-size: min(var(--info-font-size, 16px), 4vw);
   }
 }
 
@@ -1329,7 +1329,7 @@ body[data-style="neon"] .custom-select-trigger.open {
 /* 高度很矮的横屏：信息条紧凑（表盘尺寸仍由基础比例线性缩放，不在此限制） */
 @media (orientation: landscape) and (max-height: 380px) {
   .info-bar {
-    font-size: min(var(--info-font-size, 16px), 2vw);
+    font-size: min(var(--info-font-size, 16px), 4vw);
     gap: 8px;
   }
 }
@@ -1345,7 +1345,7 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: min(var(--info-font-size, 16px), 2vw);
+    font-size: min(var(--info-font-size, 16px), 4vw);
   }
 }
 
@@ -1360,7 +1360,7 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: min(var(--info-font-size, 16px), 1.8vw);
+    font-size: min(var(--info-font-size, 16px), 4vw);
   }
 }
 

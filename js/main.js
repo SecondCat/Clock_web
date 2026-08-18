@@ -58,6 +58,8 @@ let rafId = null;
 let analogActive = false;
 let syncTimer = null;    // 周期校准定时器（与时钟动画同生命周期：隐藏暂停、退出清理）
 let weatherTimer = null; // 天气定时刷新（同生命周期管理）
+let repaintTimer = null; // 强制重绘定时器（保持渲染管线活跃，防止长时间静止导致渲染错误/显存问题）
+let repaintFlag = false; // 强制重绘的交替标志（translateZ 微移 0/1px，视觉无差异）
 
 /** 启动全部定时器与动画循环（页面可见时调用） */
 function startClockAnimation() {
@@ -70,6 +72,9 @@ function startClockAnimation() {
   if (weatherTimer === null) {
     weatherTimer = setInterval(() => updateWeather(), WEATHER_REFRESH_INTERVAL); // 每 10 分钟刷新天气
   }
+  if (repaintTimer === null) {
+    repaintTimer = setInterval(forceRepaint, 500); // 每 500ms 强制重绘一次（2fps）
+  }
   if (!analogActive) {
     analogActive = true;
     const loop = () => {
@@ -79,6 +84,15 @@ function startClockAnimation() {
     };
     rafId = requestAnimationFrame(loop);
   }
+}
+
+/** 强制重绘全局屏幕：切换 #clock-app 的 translateZ（0↔1px，Z 轴微移视觉无差异），
+    强制浏览器合成器重新合成整个页面。长时间静止显示（minimal/neon 数字不变）时，
+    浏览器可能进入异常状态或 GPU/显存累积导致渲染错误，周期性强制重绘可规避 */
+function forceRepaint() {
+  repaintFlag = !repaintFlag;
+  const app = document.getElementById('clock-app');
+  if (app) app.style.transform = repaintFlag ? 'translateZ(1px)' : 'translateZ(0px)';
 }
 
 /** 停止全部定时器与动画循环（页面隐藏/退出时调用） */
@@ -94,6 +108,10 @@ function stopClockAnimation() {
   if (weatherTimer !== null) {
     clearInterval(weatherTimer);
     weatherTimer = null;
+  }
+  if (repaintTimer !== null) {
+    clearInterval(repaintTimer);
+    repaintTimer = null;
   }
   if (rafId !== null) {
     cancelAnimationFrame(rafId);
