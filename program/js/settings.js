@@ -28,6 +28,12 @@ const { clearFontCache } = window.ClockFonts;
 /* ---------- 全局缩放 ---------- */
 const ZOOM_MIN = 50, ZOOM_MAX = 200, ZOOM_STEP = 10;
 
+/* ---------- 触屏参数 ---------- */
+const MENU_FIT_SLACK = 24;      // 下拉菜单溢出不超过该值时不启用内部滚动（px）
+const SLIDER_THUMB_RADIUS = 10; // 与 CSS 中 thumb 直径 20px 对应
+const SLIDER_DRAG_SLOP = 6;     // 方向判定的最小位移（px，约 8dp 的 TouchSlop）
+const SLIDER_DIRECT_RATIO = 1.2; // 横向位移需超过纵向的 1.2 倍才判定为拖动
+
 /** 将 state.globalZoom（百分比）应用到 body 的 CSS zoom，实现页面级整体缩放。
     CSS zoom 会按比例缩放布局尺寸（含 fixed 定位的设置按钮/面板），
     视觉效果等效浏览器缩放；真正的浏览器缩放级别无法由网页 JS 直接控制，
@@ -53,6 +59,15 @@ function applyZoom() {
 function setupCustomSelects() {
   let openMenu = null; // 当前展开的菜单（互斥，同时只开一个）
   const syncFns = [];   // 每个 select 的 sync 函数，供全局 syncAll 调用
+
+  /** 菜单高度自适应：溢出量很小（如配色预设 7 项只多出十几像素）时不启用内部
+      滚动，改为完整展开——避免为了十几像素建立独立的滚动容器，抢走触摸手势，
+      让「继续滑动带动面板」这件事完全由浏览器原生滚动链处理（更顺滑）。 */
+  function fitMenuHeight(menu) {
+    menu.classList.remove('menu-fits');
+    const overflow = menu.scrollHeight - menu.clientHeight;
+    if (overflow > 0 && overflow <= MENU_FIT_SLACK) menu.classList.add('menu-fits');
+  }
 
   function closeCurrent() {
     if (openMenu) {
@@ -117,6 +132,7 @@ function setupCustomSelects() {
     function open() {
       closeCurrent();
       menu.hidden = false;
+      fitMenuHeight(menu); // 必须在可见后测量
       trigger.classList.add('open');
       openMenu = { menu, trigger };
     }
@@ -144,6 +160,94 @@ function setupCustomSelects() {
 
   // 对外暴露：所有下拉同步（编程改 value 后调用）
   window.ClockSelect = { syncAll: () => syncFns.forEach((fn) => fn()) };
+}
+
+/** 滑动条交互（按移动端平台通行做法设计）：
+    - 按下时不改值，先记住「按下点对应的值」，避免触摸下压就跳（那会先跳后回）
+    - 位移超过 slop 才判定方向：横向为主 → 接管手势，先把滑块跳到按下点，再实时跟随；
+      纵向为主 → 放弃，值不动，手势交还面板原生滚动（CSS touch-action: pan-y）
+    - 抬起：拖动过 → 保留当前值（不限制释放位置）；没拖动过（轻点）→ 定位到按下点
+    参考：iOS UISlider + UIScrollView 的手势抢占、Android SeekBar 的 TouchSlop、
+    Flutter Slider 的水平/垂直手势竞技场，做法一致：放开用户动作，用方向判定解冲突。 */
+function setupSliderDragControl() {
+  const inputs = document.querySelectorAll('.settings-body input[type="range"]');
+
+  inputs.forEach((input) => {
+    // 包一层定位容器：接管指针事件，同时给滑块留出足够的触摸高度
+    const wrap = document.createElement('span');
+    wrap.className = 'slider-drag-wrap';
+    input.parentNode.insertBefore(wrap, input);
+    wrap.appendChild(input);
+
+    let activeId = null;
+    let mode = '';        // ''（未判定）| 'drag'（横向拖动）| 'scroll'（纵向滚动）
+    let startX = 0;
+    let startY = 0;
+    let pressValue = '';  // 按下点对应的值（暂存，未判定前不写入）
+
+    const trackRect = () => wrap.getBoundingClientRect();
+
+    /** 触点横坐标 → 数值（含 thumb 半径与步长对齐） */
+    function valueAt(clientX) {
+      const rect = trackRect();
+      const min = parseFloat(input.min) || 0;
+      const max = parseFloat(input.max);
+      const step = parseFloat(input.step) || 1;
+      const usable = Math.max(1, rect.width - SLIDER_THUMB_RADIUS * 2);
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left - SLIDER_THUMB_RADIUS) / usable));
+      const raw = min + ratio * (max - min);
+      const snapped = min + Math.round((raw - min) / step) * step;
+      const clamped = Math.min(max, Math.max(min, snapped));
+      return String(Math.round(clamped * 1000) / 1000);
+    }
+
+    function applyValue(value) {
+      if (input.value === value) return;
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    wrap.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      activeId = e.pointerId;
+      mode = '';
+      startX = e.clientX;
+      startY = e.clientY;
+      pressValue = valueAt(e.clientX);
+      if (input.focus) input.focus({ preventScroll: true }); // 保留键盘可调
+      if (wrap.setPointerCapture) {
+        try { wrap.setPointerCapture(e.pointerId); } catch (err) { /* 旧浏览器忽略 */ }
+      }
+    });
+
+    wrap.addEventListener('pointermove', (e) => {
+      if (activeId !== e.pointerId) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!mode) {
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        if (absX < SLIDER_DRAG_SLOP && absY < SLIDER_DRAG_SLOP) return; // slop 内不判定
+        mode = absX > absY * SLIDER_DIRECT_RATIO ? 'drag' : 'scroll';
+        if (mode === 'drag') applyValue(pressValue); // 判定为拖动后才跳到按下点
+      }
+      if (mode === 'drag') applyValue(valueAt(e.clientX));
+    });
+
+    function finish(e, cancelled) {
+      if (activeId !== e.pointerId) return;
+      activeId = null;
+      const wasDrag = mode === 'drag';
+      const wasPending = mode === '';
+      mode = '';
+      if (wasDrag) return;      // 拖动过：保留最后数值，不限制释放位置
+      if (cancelled) return;    // 手势被系统接管（如原生滚动）：数值保持不动
+      if (wasPending) applyValue(pressValue); // 轻点：定位到按下点
+    }
+
+    wrap.addEventListener('pointerup', (e) => finish(e, false));
+    wrap.addEventListener('pointercancel', (e) => finish(e, true));
+  });
 }
 
 /** 绑定设置面板全部交互（由入口模块在 DOM 就绪后调用） */
@@ -428,9 +532,11 @@ function setupSettingsPanel() {
     saveState();
   });
 
-  // 全屏切换
+  // 全屏切换：交给 ClockFullscreen 统一处理（主动退出不触发「意外退出」的自动恢复）
   $('#fullscreen-btn').addEventListener('click', () => {
-    if (!document.fullscreenElement) {
+    if (window.ClockFullscreen) {
+      window.ClockFullscreen.toggle();
+    } else if (!document.fullscreenElement) {
       if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
     } else {
       if (document.exitFullscreen) document.exitFullscreen().catch(() => {});
@@ -448,6 +554,9 @@ function setupSettingsPanel() {
 
   // 自定义下拉组件（在所有 select 选项初始化完成后包装，含动态填充的 palette/font select）
   setupCustomSelects();
+
+  // 滑动条交互：三段式判定，避免触摸下压直接跳值
+  setupSliderDragControl();
 }
 
 /* ---------- 命名空间导出 ---------- */

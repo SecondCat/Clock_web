@@ -1129,6 +1129,13 @@ body[data-theme="dark"] #cma-warning {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+/* 溢出量很小的菜单（如配色预设 7 项）不建立内部滚动：完整展开，
+   触摸滑动直接由 .settings-body 原生滚动接管，手感与长列表一致 */
+.custom-select-menu.menu-fits {
+  max-height: none;
+  overflow-y: visible;
+}
+
 .custom-select-option:hover {
   background: var(--control-hover);
 }
@@ -1178,6 +1185,30 @@ body[data-style="neon"] .custom-select-trigger.open {
   background: var(--control-bg);
   outline: none;
   cursor: pointer;
+}
+
+/* 滑动条交互容器（由 settings.js 插入）：
+   - 接管指针事件：原生控件不再直接响应触摸，避免「按下即跳到触点」
+   - touch-action: pan-y：纵向滑动仍交给面板原生滚动（保留惯性）
+   - 上下各留 8px 触摸余量（负 margin 抵消，不影响布局高度） */
+.slider-drag-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 8px 0;
+  margin: -8px 0;
+  touch-action: pan-y;
+  cursor: pointer;
+}
+
+.slider-drag-wrap > .setting-slider {
+  display: block;
+  pointer-events: none;
+}
+
+/* 原生 input 不再接收指针事件，悬停放大的反馈挂到包装层上 */
+.slider-drag-wrap:hover .setting-slider::-webkit-slider-thumb {
+  transform: scale(1.15);
 }
 
 .setting-slider::-webkit-slider-thumb {
@@ -1510,6 +1541,123 @@ body[data-theme="dark"] .settings-body::-webkit-scrollbar-thumb {
 
   .font-toast-refresh {
     width: 100%;
+  }
+}
+
+/* ==========================================================================
+   9.1 全屏保持横幅（意外退出全屏后的恢复提示）
+   ==========================================================================
+   - 只在「非用户操作」退出全屏时出现，5 秒倒计时后尝试自动恢复全屏
+   - position:fixed 且默认 hidden，不参与主视觉布局，不影响信息栏贴靠计算 */
+
+.fs-guard {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110; /* 高于字体提示条(100)与设置面板(80)，低于自定义下拉菜单(120) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(640px, 92vw);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-color);
+  animation: fs-guard-in 0.25s ease;
+}
+
+.fs-guard[hidden] {
+  display: none;
+}
+
+@keyframes fs-guard-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.fs-guard-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--accent-color);
+}
+
+.fs-guard-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 倒计时数字：等宽数字避免逐秒跳动时宽度抖动 */
+.fs-guard-count {
+  display: inline-block;
+  min-width: 1ch;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-color);
+}
+
+/* 显式补 hidden 规则：上面的 display:inline-block 会覆盖 [hidden] 的默认 display:none */
+.fs-guard-count[hidden] {
+  display: none;
+}
+
+.fs-guard-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-color);
+  border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-color);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.fs-guard-btn:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.fs-guard-btn:active {
+  transform: scale(0.97);
+}
+
+.fs-guard-cancel {
+  border-color: var(--panel-border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.fs-guard-cancel:hover {
+  background: var(--control-hover);
+  color: var(--text-color);
+}
+
+@media (max-width: 480px) {
+  .fs-guard {
+    top: 10px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+  }
+
+  .fs-guard-btn {
+    flex: 1 1 auto;
   }
 }
 

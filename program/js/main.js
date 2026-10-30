@@ -33,7 +33,7 @@ const {
   applyStyle,
 } = window.ClockStyle;
 const {
-  preloadAllFonts, countCachedFaces, getFontLoadStatus, clearFontCache,
+  preloadAllFonts, countCachedFaces, getFontLoadStatus, clearFontCache, ensureFontLoaded,
 } = window.ClockFonts;
 const {
   setupFontToast,
@@ -47,6 +47,9 @@ const {
 const {
   setupSettingsPanel,
 } = window.ClockSettings;
+const {
+  setup: setupFullscreenGuard,
+} = window.ClockFullscreen;
 const {
   SYNC_INTERVAL,
   WEATHER_REFRESH_INTERVAL,
@@ -217,6 +220,9 @@ function init() {
 
   // 设置面板
   setupSettingsPanel();
+
+  // 全屏保持守卫：意外退出全屏后 5 秒自动恢复并给出横幅提示
+  setupFullscreenGuard();
 
   // 浏览器主题色跟随浅/深模式与配色预设变化（自动主题切换亦同步）
   watchThemeColor();
