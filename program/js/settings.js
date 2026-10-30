@@ -12,10 +12,11 @@
 const { $ } = window.ClockUtils;
 const { state, saveState } = window.ClockState;
 const { applyTheme } = window.ClockTheme;
-const { applyStyle, applyFontSettings, applyAnalogScale } = window.ClockStyle;
+const { applyStyle, applyFontSettings, applyFontVars, applyAnalogScale } = window.ClockStyle;
 const { applyPalette } = window.ClockPalette;
 const { COLOR_PRESETS } = window.ClockConfig;
 const { syncTime, setSyncEnabled } = window.ClockTime;
+const { scheduleLayoutInfoBar } = window.ClockRender;
 const {
   updateWeather,
   refreshWeatherManual,
@@ -40,6 +41,8 @@ function applyZoom() {
   document.documentElement.style.setProperty('--zoom-factor', String(z / 100));
   const val = $('#zoom-value');
   if (val) val.textContent = `${z}%`;
+  // zoom 改变主视觉的视觉坐标，需要重算信息栏贴靠位置（内部按 zoom 因子换算）
+  scheduleLayoutInfoBar();
 }
 
 /** 将所有 .setting-select 包装为自定义下拉组件：
@@ -209,6 +212,9 @@ function setupSettingsPanel() {
       state.hourFormat = Number(btn.dataset.format);
       saveState();
       syncFormatButtons();
+      // 立即按新制式重绘：AM/PM 的显隐与文本由 tick 决定，
+      // 不依赖下一次整秒调度（否则切换后最多 1 秒才生效）
+      window.ClockRender.tick();
     });
   });
 
@@ -221,34 +227,39 @@ function setupSettingsPanel() {
     });
   });
 
-  // 字体选择
+  // 字体选择（低频路径：完整应用变量 + 面板同步 + 槽位重测）
   $('#font-family-select').addEventListener('change', (e) => {
-    // 先捕获选中值：applyFontSettings 会重建 select 选项，避免之后读取到被改写的 value
+    // 先捕获选中值：面板同步与自定义下拉联动期间 value 可能被改写
     const fontCss = e.target.value;
     state.fonts[state.style] = fontCss;
     applyFontSettings(state.style);
+    scheduleLayoutInfoBar();
     saveState();
   });
 
-  // 字号滑杆
+  // 字号滑杆（高频路径：只写 CSS 变量，不重建面板控件；
+  // 字号影响数字宽度与主视觉高度 → 重测槽位宽度 + 重算信息栏贴靠）
   $('#font-size-slider').addEventListener('input', (e) => {
     state.sizes[state.style] = Number(e.target.value);
-    applyFontSettings(state.style);
+    applyFontVars(state.style);
+    window.ClockRender.scheduleDigitMeasure();
+    scheduleLayoutInfoBar();
     saveState();
   });
 
-  // 字重滑杆（每风格独立）
+  // 字重滑杆（每风格独立；不同字重的数字宽度不同，需重测槽位宽度）
   $('#font-weight-slider').addEventListener('input', (e) => {
     state.weights[state.style] = Number(e.target.value);
-    applyFontSettings(state.style);
+    applyFontVars(state.style);
+    window.ClockRender.scheduleDigitMeasure();
     saveState();
   });
 
-  // 数字间距滑杆（每风格独立；负值=字符层叠，最左在上；冒号间距由此联动派生，
-  // 不再单独调节 —— 派生公式见 style.js applyFontSettings）
+  // 数字间距滑杆（每风格独立；负值=字符层叠，最左在上；冒号间距与秒数间距
+  // 由此联动派生，不再单独调节 —— 派生公式见 style.js applyFontVars）
   $('#digit-gap-slider').addEventListener('input', (e) => {
     state.digitGaps[state.style] = Number(e.target.value);
-    applyFontSettings(state.style);
+    applyFontVars(state.style);
     saveState();
   });
 
@@ -340,13 +351,14 @@ function setupSettingsPanel() {
     });
   }
 
-  // 模拟表盘风格：数字时间显示开关
+  // 模拟表盘风格：数字时间显示开关（影响主视觉底部位置 → 重算信息栏贴靠）
   const analogDigitalToggle = $('#analog-digital-toggle');
   if (analogDigitalToggle) {
     analogDigitalToggle.checked = state.analogDigital;
     analogDigitalToggle.addEventListener('change', (e) => {
       state.analogDigital = e.target.checked;
       document.body.dataset.analogDigital = state.analogDigital ? 'on' : 'off';
+      scheduleLayoutInfoBar();
       saveState();
     });
   }
@@ -358,6 +370,7 @@ function setupSettingsPanel() {
     analogScaleSlider.addEventListener('input', (e) => {
       state.analogScale = Number(e.target.value);
       applyAnalogScale();
+      scheduleLayoutInfoBar();
       saveState();
     });
   }

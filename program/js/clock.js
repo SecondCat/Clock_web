@@ -17,6 +17,7 @@ const { applyAutoTheme } = window.ClockTheme;
 /* ---------- 渲染内部状态 ---------- */
 let lastSecond = -1;
 let lastThemeCheckMinute = -1;
+let lastStackSig = '';
 
 /** 将字符串逐位写入元素下的 <span class="digit">（位数不足自动补建，值不变不重写） */
 function renderDigits(el, str) {
@@ -49,27 +50,28 @@ function tick() {
 
   // 秒数显示开关：关闭时只隐藏 .seconds（block 元素），保留 .seconds-wrapper
   // 作为 AM/PM 的定位包含块 —— wrapper 高度归零后 AM/PM 的 bottom:calc(100%+0.18em)
-  // 仍锚定在秒数行顶上方，AM/PM 位置不变，实现秒数与 AM/PM 开关完全独立
-  els.seconds.hidden = !state.showSeconds;
+  // 仍锚定在秒数行顶上方，AM/PM 位置不变，实现秒数与 AM/PM 开关完全独立。
+  // 所有 DOM 写入前先比对现值，值未变则跳过（避免无谓的样式失效与重排）
+  const secondsHidden = !state.showSeconds;
+  if (els.seconds.hidden !== secondsHidden) els.seconds.hidden = secondsHidden;
   if (state.showSeconds && s !== lastSecond) {
     lastSecond = s;
     renderDigits(els.seconds, pad(s));
   }
 
   // AM/PM：仅由 12 小时制 + 显示开关决定，不受秒数开关影响
-  els.ampm.hidden = !(state.hourFormat === 12 && state.showAmpm);
-  if (state.hourFormat === 12) {
+  const ampmHidden = !(state.hourFormat === 12 && state.showAmpm);
+  if (els.ampm.hidden !== ampmHidden) els.ampm.hidden = ampmHidden;
+  if (state.hourFormat === 12 && els.ampm.textContent !== ampm) {
     els.ampm.textContent = ampm;
   }
 
-  els.dateDisplay.textContent = formatDate(now);
+  const dateStr = formatDate(now);
+  if (els.dateDisplay.textContent !== dateStr) els.dateDisplay.textContent = dateStr;
 
   // 层叠顺序：全局从左到右 z-index 递减（最左在上、往右依次降低），
-  // 负间距层叠时左侧字符始终盖住右侧字符
+  // 负间距层叠时左侧字符始终盖住右侧字符（内部仅在位数变化时重算）
   applyDigitStack();
-
-  // 信息条贴靠主视觉下方（跟随字号/表盘尺寸动态变化）
-  layoutInfoBar();
 
   // 自动主题：每分钟检查一次即可（秒变化不影响主题）
   if (state.themeMode === 'auto') {
@@ -85,12 +87,16 @@ function tick() {
     CSS 中信息条 top = --main-bottom + --clock-gap，实现贴靠而非固定底部。
     - minimal/neon：贴数字时间底部
     - analog + 显示数字时间：贴数字时间底部
-    - analog + 不显示数字时间：贴表盘底部 */
+    - analog + 不显示数字时间：贴表盘底部
+    由布局变化事件（风格/字号/开关/缩放/resize/字体加载）触发，不再逐帧计算 ——
+    getBoundingClientRect 会强制同步布局，放在每秒轮询里代价过高。 */
+let lastMainBottom = -1;
+
 function layoutInfoBar() {
-  const infoBar = $('#info-bar');
+  const infoBar = els.infoBar;
   if (!infoBar) return;
-  const td = document.querySelector('.time-display');
-  const ac = document.querySelector('.analog-clock');
+  const td = els.timeDisplay;
+  const ac = els.analogClock;
   // zoom 因子：getBoundingClientRect 返回视觉坐标（已含 CSS zoom 缩放），
   // 而 CSS top 是布局坐标（会被 zoom 再次缩放）→ 除以 zoom 因子回到布局坐标，
   // 保证信息栏在任意全局缩放下都精确贴靠主视觉、不溢出屏幕
@@ -105,15 +111,60 @@ function layoutInfoBar() {
   } else if (td) {
     bottom = td.getBoundingClientRect().bottom / zoom;
   }
-  if (bottom > 0) {
-    document.documentElement.style.setProperty('--main-bottom', `${bottom}px`);
+  // 位置未变则不写 CSS 变量（避免触发样式重算）
+  if (bottom > 0 && Math.abs(bottom - lastMainBottom) > 0.01) {
+    lastMainBottom = bottom;
+    els.root.style.setProperty('--main-bottom', `${bottom}px`);
+  }
+}
+
+/** 合并同一帧内的多次布局请求，并在布局稳定后再测量（快速响应路径）。 */
+let infoBarPending = false;
+function scheduleLayoutInfoBar() {
+  if (infoBarPending) return;
+  infoBarPending = true;
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      infoBarPending = false;
+      layoutInfoBar();
+    }, 0);
+  });
+}
+
+/** 主视觉尺寸观察器：字号、表盘尺寸、视口、display 切换都会改变主视觉几何，
+    ResizeObserver 在布局完成后触发，此时读取几何最准确。 */
+let layoutObserver = null;
+function setupLayoutObserver() {
+  if (layoutObserver || typeof ResizeObserver === 'undefined') return;
+  layoutObserver = new ResizeObserver(() => { layoutInfoBar(); });
+  if (els.timeDisplay) layoutObserver.observe(els.timeDisplay);
+  if (els.analogClock) layoutObserver.observe(els.analogClock);
+}
+
+/** 低频校验兜底：由 CSS 变量派生的布局（analog 下 .digital-container 的
+    top: calc(...)、表盘尺寸 derive）可能比事件晚若干帧才生效，事件驱动那一次
+    会读到中间态。这里以 500ms 为周期校验一次真实几何，仅在确有偏差时回写
+    （layoutInfoBar 内部与 lastMainBottom 比较后才会写）。
+    相比重构前每 250ms 无条件测量，调用频次由 4 次/秒降至 2 次/秒。 */
+let layoutVerifyTimer = null;
+function startLayoutVerify() {
+  if (layoutVerifyTimer !== null) return;
+  layoutVerifyTimer = setInterval(layoutInfoBar, 500);
+}
+function stopLayoutVerify() {
+  if (layoutVerifyTimer !== null) {
+    clearInterval(layoutVerifyTimer);
+    layoutVerifyTimer = null;
   }
 }
 
 /** 强制刷新（重置秒缓存并立即渲染一次），供生命周期/校准联动使用 */
 function forceRefresh() {
   lastSecond = -1;
+  lastStackSig = '';
+  lastMainBottom = -1; // 强制下次布局重新写入 --main-bottom
   tick();
+  scheduleLayoutInfoBar();
 }
 
 /** 层叠顺序：按全局从左到右给每个数字槽位设置递减的 z-index。
@@ -124,6 +175,13 @@ function forceRefresh() {
       .time-display 所在层叠上下文的排序。 */
 function applyDigitStack() {
   const groups = [els.hours, els.minutes, els.seconds];
+  // 位数签名：各组数字槽位数变化时才需重算 z-index（正常情况每秒最多变一次，
+  // 多数分钟完全不变）——避免每秒重复写 6 次 style.zIndex
+  let sig = '';
+  for (const g of groups) sig += g ? g.children.length + ',' : '0,';
+  if (sig === lastStackSig) return;
+  lastStackSig = sig;
+
   let total = 0;
   for (const g of groups) if (g) total += g.children.length;
   let idx = 0;
@@ -145,8 +203,13 @@ function applyDigitStack() {
    - 测量时机：字体加载完成后 / 字体或字号变化 / 窗口 resize。
    -------------------------------------------------------------------------- */
 
+/** 实测数字槽位宽度用的 canvas 上下文（复用同一个，避免每次测量新建 canvas
+    带来的额外 GPU 纹理分配与回收开销） */
+let measureCtx = null;
+
 function measureDigitWidthEm() {
-  const ctx = document.createElement('canvas').getContext('2d');
+  if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+  const ctx = measureCtx;
   let maxEm = 0.62; // 兜底值（JS 未运行时 CSS var 也使用该值）
   const probe = (el) => {
     if (!el) return;
@@ -182,6 +245,17 @@ function scheduleDigitMeasure() {
 window.addEventListener('clock:time-adjusted', forceRefresh);
 
 /* ---------- 命名空间导出 ---------- */
-window.ClockRender = { tick, forceRefresh, applyDigitWidth, scheduleDigitMeasure, applyDigitStack };
+window.ClockRender = {
+  tick,
+  forceRefresh,
+  applyDigitWidth,
+  scheduleDigitMeasure,
+  applyDigitStack,
+  layoutInfoBar,
+  scheduleLayoutInfoBar,
+  setupLayoutObserver,
+  startLayoutVerify,
+  stopLayoutVerify,
+};
 
 })();

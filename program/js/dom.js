@@ -21,6 +21,14 @@ const els = {
   hourHand: document.querySelector('#hour-hand'),
   minuteHand: document.querySelector('#minute-hand'),
   secondHand: document.querySelector('#second-hand'),
+  // 布局与测量高频访问的容器/节点：统一在此缓存，避免每帧 querySelector
+  app: document.querySelector('#clock-app'),
+  timeDisplay: document.querySelector('#time-display'),
+  digitalContainer: document.querySelector('#digital-container'),
+  analogContainer: document.querySelector('#analog-container'),
+  infoBar: document.querySelector('#info-bar'),
+  weatherDisplay: document.querySelector('#weather-display'),
+  root: document.documentElement,
 };
 
 window.ClockDom = { els };

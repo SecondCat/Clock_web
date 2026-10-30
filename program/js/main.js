@@ -16,8 +16,10 @@ const {
   abortPendingRequests,
 } = window.ClockUtils;
 const {
-  tick, forceRefresh, applyDigitWidth, scheduleDigitMeasure,
+  tick, forceRefresh, applyDigitWidth, scheduleDigitMeasure, scheduleLayoutInfoBar, setupLayoutObserver,
+  startLayoutVerify, stopLayoutVerify,
 } = window.ClockRender;
+const { els } = window.ClockDom;
 const {
   buildAnalogClockFace, updateAnalogClock,
 } = window.ClockAnalog;
@@ -54,17 +56,59 @@ const {
 
 /* ---------- 生命周期变量（定时器/rAF 句柄） ---------- */
 let tickTimer = null;
-let rafId = null;
-let analogActive = false;
+let analogRafId = null;
 let syncTimer = null;    // 周期校准定时器（与时钟动画同生命周期：隐藏暂停、退出清理）
 let weatherTimer = null; // 天气定时刷新（同生命周期管理）
 let repaintTimer = null; // 强制重绘定时器（保持渲染管线活跃，防止长时间静止导致渲染错误/显存问题）
 let repaintFlag = false; // 强制重绘的交替标志（translateZ 微移 0/1px，视觉无差异）
+let running = false;     // 动画是否处于运行状态（页面可见性控制）
+
+/** 整秒对齐调度：定时到「下一个整秒 + 少量容差」，使秒数准点跳变，
+    且每秒只渲染一次（原 250ms 轮询有 3/4 的调用落在秒数未变化的空转上） */
+function scheduleTick() {
+  if (!running) return;
+  const delay = 1000 - (nowMs() % 1000) + 8;
+  tickTimer = setTimeout(() => {
+    if (!running) return;
+    try {
+      tick();
+    } finally {
+      scheduleTick();
+    }
+  }, delay);
+}
+
+/** 表针逐帧驱动：仅在 analog 风格下运行。
+    其它风格下表盘为 display:none，逐帧 setAttribute 不产生任何可见效果，
+    纯属空转开销（实测约 90fps × 3 次 setAttribute/秒） */
+function startAnalogLoop() {
+  if (analogRafId !== null) return;
+  const loop = () => {
+    if (analogRafId === null) return;
+    updateAnalogClock(new Date(nowMs()));
+    analogRafId = requestAnimationFrame(loop);
+  };
+  analogRafId = requestAnimationFrame(loop);
+}
+
+function stopAnalogLoop() {
+  if (analogRafId !== null) {
+    cancelAnimationFrame(analogRafId);
+    analogRafId = null;
+  }
+}
+
+/** 按当前风格启停表针动画（风格切换与应用初始化时调用） */
+function syncAnalogLoop() {
+  if (running && state.style === 'analog') startAnalogLoop();
+  else stopAnalogLoop();
+}
 
 /** 启动全部定时器与动画循环（页面可见时调用） */
 function startClockAnimation() {
+  running = true;
   if (tickTimer === null) {
-    tickTimer = setInterval(tick, 250); // 250ms 粒度保证数字显示与冒号同步
+    scheduleTick(); // 首次渲染由调用方（init / forceRefresh）完成，这里只接续整秒调度
   }
   if (syncTimer === null) {
     syncTimer = setInterval(syncTime, SYNC_INTERVAL); // 每小时自动重新校准
@@ -75,15 +119,8 @@ function startClockAnimation() {
   if (repaintTimer === null) {
     repaintTimer = setInterval(forceRepaint, 500); // 每 500ms 强制重绘一次（2fps）
   }
-  if (!analogActive) {
-    analogActive = true;
-    const loop = () => {
-      if (!analogActive) return;
-      updateAnalogClock(new Date(nowMs()));
-      rafId = requestAnimationFrame(loop);
-    };
-    rafId = requestAnimationFrame(loop);
-  }
+  syncAnalogLoop();
+  startLayoutVerify();
 }
 
 /** 强制重绘全局屏幕：切换 #clock-app 的 translateZ（0↔1px，Z 轴微移视觉无差异），
@@ -91,14 +128,14 @@ function startClockAnimation() {
     浏览器可能进入异常状态或 GPU/显存累积导致渲染错误，周期性强制重绘可规避 */
 function forceRepaint() {
   repaintFlag = !repaintFlag;
-  const app = document.getElementById('clock-app');
-  if (app) app.style.transform = repaintFlag ? 'translateZ(1px)' : 'translateZ(0px)';
+  if (els.app) els.app.style.transform = repaintFlag ? 'translateZ(1px)' : 'translateZ(0px)';
 }
 
 /** 停止全部定时器与动画循环（页面隐藏/退出时调用） */
 function stopClockAnimation() {
+  running = false;
   if (tickTimer !== null) {
-    clearInterval(tickTimer);
+    clearTimeout(tickTimer);
     tickTimer = null;
   }
   if (syncTimer !== null) {
@@ -113,11 +150,8 @@ function stopClockAnimation() {
     clearInterval(repaintTimer);
     repaintTimer = null;
   }
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
-  analogActive = false;
+  stopAnalogLoop();
+  stopLayoutVerify();
 }
 
 /** 退出/隐藏时释放全部后台资源：停止定时器与动画、中断请求 */
@@ -151,11 +185,23 @@ function init() {
   // 数字槽位宽度：先按当前字体测量；Web 字体加载完成后重测，覆盖精确宽度
   scheduleDigitMeasure();
   if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(() => setTimeout(applyDigitWidth, 100));
+    document.fonts.ready.then(() => setTimeout(() => {
+      applyDigitWidth();
+      scheduleLayoutInfoBar(); // 字体生效可能改变主视觉几何，重算信息栏贴靠位置
+    }, 100));
   }
   // 字体加载完成（本地缓存注入/网络加载成功）后同样重测槽位宽度
   window.addEventListener('clock:fonts-loaded', () => {
-    setTimeout(applyDigitWidth, 100);
+    setTimeout(() => {
+      applyDigitWidth();
+      scheduleLayoutInfoBar();
+    }, 100);
+  });
+
+  // 风格切换后：表针动画按需启停（analog 才逐帧驱动）+ 重算信息栏贴靠位置
+  window.addEventListener('clock:style-applied', () => {
+    syncAnalogLoop();
+    scheduleLayoutInfoBar();
   });
 
   // 打开页面后自动下载全部网络字体（每个字体族只尝试 1 次，失败不重试不中断其余）
@@ -163,6 +209,9 @@ function init() {
 
   // 立即渲染一次时钟（避免空白闪烁）
   tick();
+  // 首次布局：计算信息栏贴靠位置，并挂上主视觉尺寸观察器
+  setupLayoutObserver();
+  scheduleLayoutInfoBar();
   // 定时器与 rAF 由生命周期统一管理：页面隐藏时暂停、回到前台恢复、退出时清理
   startClockAnimation();
 
@@ -185,6 +234,7 @@ function init() {
     window.__resizeTimer = setTimeout(() => {
       handleOrientation();
       applyDigitWidth(); // 视口约束可能改变实际字号，重新测量槽位宽度
+      scheduleLayoutInfoBar(); // 视口变化 → 主视觉几何变化，重算信息栏贴靠位置
     }, 200);
   });
 
