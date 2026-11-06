@@ -30,6 +30,7 @@ const state = {
   sizes: {},               // { minimal: 92, neon: 84, analog: 40 }
   weights: {},             // { minimal: 200, neon: 700, analog: 400 }
   digitGaps: {},           // { minimal: 0, neon: 0, analog: 0 } 数字间距（em，负值=字符层叠；冒号间距由此联动派生）
+  perfMode: '',            // 渲染档位：''=自动（低内存 Firefox 走轻量）| 'lite' | 'full'
   weather: null,           // 最近一次天气数据
   weatherTimestamp: 0,
   location: null,          // 最近一次定位
@@ -58,6 +59,7 @@ function loadState() {
       if (typeof state.globalZoom !== 'number') state.globalZoom = 100;
       state.globalZoom = Math.min(200, Math.max(50, Math.round(state.globalZoom)));
       if (typeof state.analogScale !== 'number') state.analogScale = 100;
+      if (state.perfMode !== 'lite' && state.perfMode !== 'full') state.perfMode = '';
       state.analogScale = Math.min(200, Math.max(50, Math.round(state.analogScale)));
     }
   } catch (e) {
@@ -90,6 +92,7 @@ function saveState() {
       weatherSource: state.weatherSource,
       globalZoom: state.globalZoom,
       analogScale: state.analogScale,
+      perfMode: state.perfMode,
       fonts: state.fonts,
       sizes: state.sizes,
       weights: state.weights,

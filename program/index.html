@@ -222,6 +222,11 @@
             <button id="zoom-in-btn" class="zoom-btn" aria-label="放大" title="放大">＋</button>
           </div>
         </div>
+        <label class="toggle-row" id="lite-render-row">
+          <span class="toggle-text">轻量渲染（低配 / 旧版浏览器）</span>
+          <input type="checkbox" id="lite-render-toggle" class="toggle-switch">
+        </label>
+        <p class="setting-hint">低内存设备会自动开启：关闭毛玻璃与大字光晕、停掉光斑动画，画面更稳但光效略弱。</p>
         <button id="fullscreen-btn" class="action-btn">⛶ 切换全屏</button>
       </section>
 
@@ -238,8 +243,9 @@
 
   <!-- 模块化脚本：经典脚本 + 全局命名空间（window.ClockXxx），无需本地服务器/Node，
        双击 HTML（file:// 协议）即可运行。加载顺序即依赖顺序（defer 保证按文档序执行）：
-       utils → config → dom → state → timeSync → theme → clock → analogClock →
+       perf → utils → config → dom → state → timeSync → theme → clock → analogClock →
        fonts → fontToast → style → palette → weather → fullscreen → settings → main -->
+  <script src="js/perf.js" defer></script>
   <script src="js/utils.js" defer></script>
   <script src="js/config.js" defer></script>
   <script src="js/dom.js" defer></script>

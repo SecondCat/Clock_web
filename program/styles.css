@@ -110,7 +110,14 @@ body[data-theme="dark"] {
   /* 由 JS 动态设置 --clock-font 与 --clock-font-size；
      min() 视口约束保证任何字号下都不溢出 */
   font-family: var(--clock-font, 'Inter', sans-serif);
-  font-size: min(var(--clock-font-size, 96px), calc(20vw / var(--zoom-factor, 1)), calc(28vh / var(--zoom-factor, 1)));
+  /* 三段约束统一走变量：--clock-size-cap 为字号上限，--clock-size-vw/vh 为
+     视口比例系数（无单位数字）。横竖屏媒体查询只覆盖这两个系数，
+     不再重复整条 font-size（旧实现有 9 处重复声明，改动时极易漏改） */
+  font-size: min(
+    var(--clock-font-size, var(--clock-size-cap, 96px)),
+    calc(var(--clock-size-vw, 20) * 1vw / var(--zoom-factor, 1)),
+    calc(var(--clock-size-vh, 28) * 1vh / var(--zoom-factor, 1))
+  );
   font-weight: var(--clock-font-weight, 200);
   line-height: 1.05;
   letter-spacing: 0.02em;
@@ -600,7 +607,9 @@ body[data-style="analog"] .digital-container {
 
 /* analog 风格下数字时间缩小，置于表盘下方 */
 body[data-style="analog"] .time-display {
-  font-size: min(var(--clock-font-size, 40px), calc(8vw / var(--zoom-factor, 1)), calc(10vh / var(--zoom-factor, 1)));
+  --clock-size-cap: 40px;
+  --clock-size-vw: 8;
+  --clock-size-vh: 10;
   /* 模拟表盘下秒数略大、下移量更小（覆盖 --seconds-scale/--seconds-shift，
      定位 margin-top 公式自动适配，无需单独改 margin） */
   --seconds-scale: 0.42;
@@ -614,7 +623,6 @@ body[data-style="analog"][data-analog-digital="off"] .digital-container {
 }
 
 body[data-style="analog"] .info-bar {
-  font-size: min(var(--info-font-size, 16px), 4vw);
 }
 
 /* ==========================================================================
@@ -1307,22 +1315,24 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   .time-display {
-    font-size: min(var(--clock-font-size, 96px), calc(17vw / var(--zoom-factor, 1)), calc(30vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 17;
+    --clock-size-vh: 30;
   }
 
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), calc(7vw / var(--zoom-factor, 1)), calc(9vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 7;
+    --clock-size-vh: 9;
   }
 
   .info-bar {
-    font-size: min(var(--info-font-size, 16px), 4vw);
-  }
+    }
 }
 
 /* --- 横屏：防止过高导致溢出，限制高度 --- */
 @media (orientation: landscape) and (max-height: 520px) {
   .time-display {
-    font-size: min(var(--clock-font-size, 96px), calc(26vw / var(--zoom-factor, 1)), calc(42vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 26;
+    --clock-size-vh: 42;
     /* 横屏矮屏下秒数收紧（覆盖 --seconds-scale/--seconds-font-size，定位公式自动适配） */
     --seconds-scale: 0.3;
     --seconds-font-size: 0.3em;
@@ -1333,7 +1343,8 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), calc(12vw / var(--zoom-factor, 1)), calc(12vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 12;
+    --clock-size-vh: 12;
     /* analog 规则特异性 (0,2,1) 高于上方通用 .time-display (0,1,0)，
        需同特异性重声明秒数收紧才能覆盖 0.42 */
     --seconds-scale: 0.3;
@@ -1341,14 +1352,14 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: min(var(--info-font-size, 16px), 4vw);
-  }
+    }
 }
 
 /* 超小屏设备（如智能手表尺寸） */
 @media (max-width: 320px) {
   .time-display {
-    font-size: min(var(--clock-font-size, 96px), calc(15vw / var(--zoom-factor, 1)), calc(28vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 15;
+    --clock-size-vh: 28;
   }
 
   .info-bar {
@@ -1360,8 +1371,7 @@ body[data-style="neon"] .custom-select-trigger.open {
 /* 高度很矮的横屏：信息条紧凑（表盘尺寸仍由基础比例线性缩放，不在此限制） */
 @media (orientation: landscape) and (max-height: 380px) {
   .info-bar {
-    font-size: min(var(--info-font-size, 16px), 4vw);
-    gap: 8px;
+      gap: 8px;
   }
 }
 
@@ -1372,12 +1382,12 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), calc(7vw / var(--zoom-factor, 1)), calc(8vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 7;
+    --clock-size-vh: 8;
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: min(var(--info-font-size, 16px), 4vw);
-  }
+    }
 }
 
 /* 极矮屏幕（高度 ≤ 500px）：数字时间与信息条紧凑排列（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
@@ -1387,12 +1397,12 @@ body[data-style="neon"] .custom-select-trigger.open {
   }
 
   body[data-style="analog"] .time-display {
-    font-size: min(var(--clock-font-size, 40px), calc(6vw / var(--zoom-factor, 1)), calc(7vh / var(--zoom-factor, 1)));
+    --clock-size-vw: 6;
+    --clock-size-vh: 7;
   }
 
   body[data-style="analog"] .info-bar {
-    font-size: min(var(--info-font-size, 16px), 4vw);
-  }
+    }
 }
 
 /* 隐藏滚动条但保持可滚动（设置面板内） */
@@ -1659,6 +1669,56 @@ body[data-theme="dark"] .settings-body::-webkit-scrollbar-thumb {
   .fs-guard-btn {
     flex: 1 1 auto;
   }
+}
+
+/* ==========================================================================
+   10. 轻量渲染档（html[data-perf="lite"]）
+   ==========================================================================
+   触发条件见 js/perf.js：Firefox + 低内存，或 URL 加 ?perf=lite 手动指定。
+   解决的问题（2026-11-06 实测现象）：低内存 Firefox 出现黑块与残影。
+   成因是三类高栅格化成本叠加，软件合成时 tile 被丢弃：
+     ① 数字使用 4 层 text-shadow，最远 120px 模糊，单字阴影覆盖数百像素
+     ② 每 500ms 把整个 #clock-app 的 translateZ 变一次（强制整层重栅格化）
+     ③ 全屏 ::before 光斑动画持续 scale
+   ①③ 在此收敛，② 在 main.js 中按档位关闭。
+   使用 !important 是有意的：这是压在全部风格/配色规则之上的「降级层」，
+   必须无视后续任何风格规则的 text-shadow 声明。 */
+
+html[data-perf="lite"] .time-display {
+  text-shadow: 0 0 10px rgba(var(--accent-rgb), 0.28) !important;
+}
+
+html[data-perf="lite"] .time-display .colon,
+html[data-perf="lite"] .time-display .seconds-wrapper,
+html[data-perf="lite"] .time-display .ampm {
+  text-shadow: 0 0 8px rgba(var(--accent-rgb), 0.22) !important;
+}
+
+html[data-perf="lite"] .info-bar {
+  text-shadow: none !important;
+}
+
+/* 全屏光斑动画：保留静态光斑（视觉层次不丢），停掉持续的 scale 动画 */
+html[data-perf="lite"] #clock-app::before {
+  animation: none !important;
+}
+
+/* 半透明面板的毛玻璃：软件合成下代价高且易出条纹，退化为实色背景 */
+html[data-perf="lite"] .settings-panel,
+html[data-perf="lite"] .settings-overlay,
+html[data-perf="lite"] .font-toast,
+html[data-perf="lite"] .fs-guard {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-perf="lite"] .settings-panel {
+  background: var(--bg-color);
+}
+
+html[data-perf="lite"] .font-toast,
+html[data-perf="lite"] .fs-guard {
+  background: var(--control-bg);
 }
 
 /* ==========================================================================

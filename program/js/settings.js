@@ -532,6 +532,17 @@ function setupSettingsPanel() {
     saveState();
   });
 
+  // 轻量渲染：关掉毛玻璃/大字光晕/光斑动画与强制重绘（低内存设备自动开启）
+  const liteToggle = $('#lite-render-toggle');
+  if (liteToggle && window.ClockPerf) {
+    liteToggle.checked = window.ClockPerf.mode === 'lite';
+    liteToggle.addEventListener('change', () => {
+      state.perfMode = liteToggle.checked ? 'lite' : 'full';
+      window.ClockPerf.apply(state.perfMode);
+      saveState();
+    });
+  }
+
   // 全屏切换：交给 ClockFullscreen 统一处理（主动退出不触发「意外退出」的自动恢复）
   $('#fullscreen-btn').addEventListener('click', () => {
     if (window.ClockFullscreen) {
