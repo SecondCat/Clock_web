@@ -11,7 +11,7 @@ const STORAGE_KEY = 'fullscreenClockPrefs_v1';
 const LOCATION_KEY = 'fullscreenClockLocation_v1'; // 定位缓存（localStorage，天气优先使用）
 const AMAP_KEY_STORAGE = 'fullscreenClockAmapKey_v1'; // 高德 Web 服务 API Key（仅存本机）
 
-/* ---------- 全部可选字体（所有风格共用：合并原 minimal/neon/analog 三套列表） ---------- */
+/* ---------- 全部可选字体（两种风格共用同一套列表） ---------- */
 const ALL_FONTS = [
   { value: "'Inter', 'PingFang SC', sans-serif",              label: 'Inter（现代无衬线）' },
   { value: "'Montserrat', 'PingFang SC', sans-serif",         label: 'Montserrat（几何无衬线）' },
@@ -36,7 +36,7 @@ const ALL_FONTS = [
   { value: "Palatino, 'Palatino Linotype', 'Book Antiqua', serif", label: 'Palatino（系统衬线）' },
 ];
 
-/* ---------- 三种风格的配置：默认字体/字号/字重、字号范围（字体列表统一用 ALL_FONTS） ---------- */
+/* ---------- 风格配置：默认字体/字号/字重、字号范围（字体列表统一用 ALL_FONTS） ---------- */
 const STYLE_CONFIGS = {
   minimal: {
     label: '极简',
@@ -45,14 +45,6 @@ const STYLE_CONFIGS = {
     defaultWeight: 200,
     minSize: 32,
     maxSize: 360,
-  },
-  neon: {
-    label: '霓虹',
-    defaultFont: "'Orbitron', sans-serif",
-    defaultSize: 84,
-    defaultWeight: 700,
-    minSize: 32,
-    maxSize: 340,
   },
   analog: {
     label: '表盘',

@@ -73,6 +73,9 @@ function tick() {
   // 负间距层叠时左侧字符始终盖住右侧字符（内部仅在位数变化时重算）
   applyDigitStack();
 
+  // 发光副本同步：未启用发光时 glow.sync() 内部直接返回，无额外开销
+  if (window.ClockGlow) window.ClockGlow.sync();
+
   // 自动主题：每分钟检查一次即可（秒变化不影响主题）
   if (state.themeMode === 'auto') {
     const minKey = now.getHours() * 60 + now.getMinutes();
@@ -85,7 +88,7 @@ function tick() {
 
 /** 信息条贴靠主视觉：计算主视觉（数字时间/表盘）底部位置写入 --main-bottom，
     CSS 中信息条 top = --main-bottom + --clock-gap，实现贴靠而非固定底部。
-    - minimal/neon：贴数字时间底部
+    - minimal：贴数字时间底部
     - analog + 显示数字时间：贴数字时间底部
     - analog + 不显示数字时间：贴表盘底部
     由布局变化事件（风格/字号/开关/缩放/resize/字体加载）触发，不再逐帧计算 ——

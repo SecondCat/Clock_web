@@ -532,13 +532,13 @@ function setupSettingsPanel() {
     saveState();
   });
 
-  // 轻量渲染：关掉毛玻璃/大字光晕/光斑动画与强制重绘（低内存设备自动开启）
-  const liteToggle = $('#lite-render-toggle');
-  if (liteToggle && window.ClockPerf) {
-    liteToggle.checked = window.ClockPerf.mode === 'lite';
-    liteToggle.addEventListener('change', () => {
-      state.perfMode = liteToggle.checked ? 'lite' : 'full';
-      window.ClockPerf.apply(state.perfMode);
+  // 数字发光开关：三层模糊副本（见 glow.js 与报告第 12 节）
+  const glowToggle = $('#glow-toggle');
+  if (glowToggle && window.ClockGlow) {
+    glowToggle.checked = state.glow === 'on';
+    glowToggle.addEventListener('change', () => {
+      state.glow = glowToggle.checked ? 'on' : 'off';
+      window.ClockGlow.apply(state.glow);
       saveState();
     });
   }

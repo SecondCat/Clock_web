@@ -50,7 +50,7 @@ const {
 const {
   setup: setupFullscreenGuard,
 } = window.ClockFullscreen;
-const perf = window.ClockPerf || { mode: 'full', isFirefox: false };
+
 const {
   SYNC_INTERVAL,
   WEATHER_REFRESH_INTERVAL,
@@ -120,9 +120,8 @@ function startClockAnimation() {
   if (weatherTimer === null) {
     weatherTimer = setInterval(() => updateWeather(), WEATHER_REFRESH_INTERVAL); // 每 10 分钟刷新天气
   }
-  // 强制重绘只在「完整档且非 Firefox」时启用：它会周期性让整个 #clock-app
-  // 重新栅格化，在低内存 Firefox 上正是黑块/残影的成因（见 perf.js 说明）
-  if (repaintTimer === null && perf.mode !== 'lite' && !perf.isFirefox) {
+  // 强制重绘：所有浏览器一律启用（2026-11-12 按要求统一行为，不再按 UA 分支）
+  if (repaintTimer === null) {
     repaintTimer = setInterval(forceRepaint, 500); // 每 500ms 强制重绘一次（2fps）
   }
   syncAnalogLoop();
@@ -130,7 +129,7 @@ function startClockAnimation() {
 }
 
 /** 强制重绘全局屏幕：切换 #clock-app 的 translateZ（0↔1px，Z 轴微移视觉无差异），
-    强制浏览器合成器重新合成整个页面。长时间静止显示（minimal/neon 数字不变）时，
+    强制浏览器合成器重新合成整个页面。长时间静止显示（minimal 数字不变）时，
     浏览器可能进入异常状态或 GPU/显存累积导致渲染错误，周期性强制重绘可规避。
     ⚠ 2026-11-06：该手段在低内存 Firefox 上反而造成黑块/残影（整层反复重新栅格化 +
     大字发光阴影），故轻量档与 Firefox 下不启动，见 startClockAnimation 的条件。 */
@@ -179,9 +178,6 @@ function handleOrientation() {
 function init() {
   loadState();
 
-  // 渲染档位：用户偏好优先，未设置则沿用 perf.js 的自动判定（低内存 Firefox → lite）
-  if (window.ClockPerf && window.ClockPerf.apply) window.ClockPerf.apply(state.perfMode);
-
   // 读取缓存的定位信息：即使定位权限关闭/被拒，也能基于上次定位展示天气
   state.location = loadCachedLocation();
 
@@ -192,6 +188,9 @@ function init() {
 
   // 构建模拟表盘
   buildAnalogClockFace();
+
+  // 数字发光：按用户偏好创建三层模糊副本
+  if (window.ClockGlow) window.ClockGlow.setup(state.glow);
 
   // 数字槽位宽度：先按当前字体测量；Web 字体加载完成后重测，覆盖精确宽度
   scheduleDigitMeasure();
@@ -295,8 +294,6 @@ if (typeof window !== 'undefined') {
       get weatherTimerActive() { return weatherTimer !== null; },
       get amapKeyConfigured() { return getAmapKey() !== ''; },
       get autoSync() { return state.autoSync; },
-      get perfMode() { return perf.mode; },
-      get perfIsFirefox() { return !!perf.isFirefox; },
       get analogDigital() { return state.analogDigital; },
       get weatherSource() { return state.weatherSource; },
       get fontCacheCount() { return countCachedFaces(); },

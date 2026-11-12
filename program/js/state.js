@@ -11,7 +11,7 @@ const { STORAGE_KEY, STYLE_CONFIGS, COLOR_PRESETS } = window.ClockConfig;
 
 /** 全局状态（可变对象，各模块直接读写属性） */
 const state = {
-  style: 'minimal',        // minimal | neon | analog
+  style: 'minimal',        // minimal | analog
   hourFormat: 24,          // 24 | 12
   themeMode: 'auto',       // auto | light | dark
   colorPreset: 'default',  // 配色预设：default | ocean | sunset | forest | sakura | graphite | amethyst
@@ -26,24 +26,25 @@ const state = {
   globalZoom: 100,         // 全局缩放百分比（50-200，步进 10；CSS zoom 实现页面级整体缩放）
   analogScale: 100,        // 表盘尺寸缩放百分比（50-200，步进 5；仅 analog 风格，乘到 vh/vw 基础比例上）
   // 每种风格的独立字体设置
-  fonts: {},               // { minimal: '...', neon: '...', analog: '...' }
-  sizes: {},               // { minimal: 92, neon: 84, analog: 40 }
-  weights: {},             // { minimal: 200, neon: 700, analog: 400 }
-  digitGaps: {},           // { minimal: 0, neon: 0, analog: 0 } 数字间距（em，负值=字符层叠；冒号间距由此联动派生）
-  perfMode: '',            // 渲染档位：''=自动（低内存 Firefox 走轻量）| 'lite' | 'full'
+  fonts: {},               // { minimal: '...', analog: '...' }
+  sizes: {},               // { minimal: 92, analog: 40 }
+  weights: {},             // { minimal: 200, analog: 400 }
+  digitGaps: {},           // { minimal: 0, analog: 0 } 数字间距（em，负值=字符层叠；冒号间距由此联动派生）
+  glow: 'on',              // 数字发光开关：'on' | 'off'（开启即冷光灯管效果）
   weather: null,           // 最近一次天气数据
   weatherTimestamp: 0,
   location: null,          // 最近一次定位
 };
 
 function loadState() {
+  let dirty = false; // 本次载入是否修正过存档（含移除风格的数据清理），需要回写
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const saved = JSON.parse(raw);
       Object.assign(state, saved);
-      // 确保未知字段回退默认
-      if (!STYLE_CONFIGS[state.style]) state.style = 'minimal';
+      // 确保未知字段回退默认（2026-11-12 移除霓虹风后，旧存档的 style:"neon" 走这里）
+      if (!STYLE_CONFIGS[state.style]) { state.style = 'minimal'; dirty = true; }
       if (state.hourFormat !== 12 && state.hourFormat !== 24) state.hourFormat = 24;
       if (!['auto', 'light', 'dark'].includes(state.themeMode)) state.themeMode = 'auto';
       if (!COLOR_PRESETS[state.colorPreset]) state.colorPreset = 'default';
@@ -59,7 +60,9 @@ function loadState() {
       if (typeof state.globalZoom !== 'number') state.globalZoom = 100;
       state.globalZoom = Math.min(200, Math.max(50, Math.round(state.globalZoom)));
       if (typeof state.analogScale !== 'number') state.analogScale = 100;
-      if (state.perfMode !== 'lite' && state.perfMode !== 'full') state.perfMode = '';
+      // 旧值 soft（原柔和档）/ strong（原强光档）统一并入 on：2026-11-12 起只保留一档
+      if (state.glow === 'soft' || state.glow === 'strong') { state.glow = 'on'; dirty = true; }
+      else if (state.glow !== 'on' && state.glow !== 'off') state.glow = 'on';
       state.analogScale = Math.min(200, Math.max(50, Math.round(state.analogScale)));
     }
   } catch (e) {
@@ -73,6 +76,15 @@ function loadState() {
     if (typeof state.weights[key] !== 'number') state.weights[key] = cfg.defaultWeight;
     if (typeof state.digitGaps[key] !== 'number') state.digitGaps[key] = 0;
   }
+  // 轻量渲染档已移除（2026-11-12）：旧存档里的 perfMode 一并丢弃，避免留下幽灵字段
+  if ('perfMode' in state) { delete state.perfMode; dirty = true; }
+  // 清理已移除风格（neon）遗留的分风格设置，避免存档无限累积
+  for (const map of ['fonts', 'sizes', 'weights', 'digitGaps']) {
+    for (const key of Object.keys(state[map])) {
+      if (!STYLE_CONFIGS[key]) { delete state[map][key]; dirty = true; }
+    }
+  }
+  if (dirty) saveState();
 }
 
 function saveState() {
@@ -92,7 +104,7 @@ function saveState() {
       weatherSource: state.weatherSource,
       globalZoom: state.globalZoom,
       analogScale: state.analogScale,
-      perfMode: state.perfMode,
+      glow: state.glow,
       fonts: state.fonts,
       sizes: state.sizes,
       weights: state.weights,

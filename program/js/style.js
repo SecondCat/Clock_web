@@ -14,7 +14,7 @@ const { ALL_FONTS, STYLE_CONFIGS } = window.ClockConfig;
 const { scheduleDigitMeasure } = window.ClockRender;
 const { ensureFontLoaded } = window.ClockFonts;
 
-/** 切换时钟风格（minimal | neon | analog），并应用该风格的字体设置 */
+/** 切换时钟风格（minimal | analog），并应用该风格的字体设置 */
 function applyStyle(style, { persist = true } = {}) {
   state.style = style;
   document.body.dataset.style = style;

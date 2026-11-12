@@ -38,7 +38,7 @@
       </svg>
     </div>
 
-    <!-- ============ 数字时间（minimal / neon 主显示，analog 辅显示） ============ -->
+    <!-- ============ 数字时间（minimal 主显示，analog 显示在表盘下方） ============ -->
     <div class="digital-container" id="digital-container">
       <div class="time-display" id="time-display">
         <span class="hours" id="hours"><span class="digit">0</span><span class="digit">0</span></span>
@@ -88,9 +88,13 @@
         <h3>时钟风格</h3>
         <select id="style-select" class="setting-select" aria-label="时钟风格">
           <option value="minimal">◧ 极简</option>
-          <option value="neon">◈ 霓虹</option>
           <option value="analog">◔ 表盘</option>
         </select>
+        <!-- 数字发光：三层模糊副本，光紧贴笔画（见 js/glow.js、报告第 12 节） -->
+        <label class="toggle-row" id="glow-toggle-row">
+          <span class="toggle-text">数字发光</span>
+          <input type="checkbox" id="glow-toggle" class="toggle-switch">
+        </label>
         <!-- 表盘尺寸缩放（仅 analog 风格下显示）：滑动条作为缩放系数，乘到 vh/vw 基础比例上 -->
         <label class="setting-label" id="analog-scale-row" hidden>
           <span class="label-text">表盘尺寸</span>
@@ -222,11 +226,6 @@
             <button id="zoom-in-btn" class="zoom-btn" aria-label="放大" title="放大">＋</button>
           </div>
         </div>
-        <label class="toggle-row" id="lite-render-row">
-          <span class="toggle-text">轻量渲染（低配 / 旧版浏览器）</span>
-          <input type="checkbox" id="lite-render-toggle" class="toggle-switch">
-        </label>
-        <p class="setting-hint">低内存设备会自动开启：关闭毛玻璃与大字光晕、停掉光斑动画，画面更稳但光效略弱。</p>
         <button id="fullscreen-btn" class="action-btn">⛶ 切换全屏</button>
       </section>
 
@@ -243,9 +242,9 @@
 
   <!-- 模块化脚本：经典脚本 + 全局命名空间（window.ClockXxx），无需本地服务器/Node，
        双击 HTML（file:// 协议）即可运行。加载顺序即依赖顺序（defer 保证按文档序执行）：
-       perf → utils → config → dom → state → timeSync → theme → clock → analogClock →
-       fonts → fontToast → style → palette → weather → fullscreen → settings → main -->
-  <script src="js/perf.js" defer></script>
+       utils → config → dom → state → timeSync → theme → clock → glow →
+       analogClock → fonts → fontToast → style → palette → weather → fullscreen →
+       settings → main -->
   <script src="js/utils.js" defer></script>
   <script src="js/config.js" defer></script>
   <script src="js/dom.js" defer></script>
@@ -253,6 +252,7 @@
   <script src="js/timeSync.js" defer></script>
   <script src="js/theme.js" defer></script>
   <script src="js/clock.js" defer></script>
+  <script src="js/glow.js" defer></script>
   <script src="js/analogClock.js" defer></script>
   <script src="js/fonts.js" defer></script>
   <script src="js/fontToast.js" defer></script>
