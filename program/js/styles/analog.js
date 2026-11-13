@@ -1,7 +1,9 @@
 /* ==========================================================================
-   analogClock.js - 模拟表盘（SVG 表盘构建与表针驱动）
-   经典脚本模式：依赖 dom.js（ClockDom）、timeSync.js（ClockTime，需先加载）
+   analog.js - 风格套件：模拟表盘（SVG 表盘构建、表针驱动、表盘专属面板行）
+   经典脚本模式：依赖 core/dom.js（ClockDom）、core/timeSync.js（ClockTime）
    导出挂载到 window.ClockAnalog
+   本文件是「表盘风格」的唯一边界：表盘相关的状态应用（尺寸缩放、面板行显隐）
+   都在这里，ui/style.js 只负责调用，不再直接操作表盘 DOM（2026-11-13 分层）。
    ========================================================================== */
 'use strict';
 
@@ -73,7 +75,28 @@ window.addEventListener('clock:time-adjusted', () => {
   updateAnalogClock(new Date(nowMs()));
 });
 
+/** 表盘尺寸缩放：把 state.analogScale（百分比）写成 --analog-scale（0.5–2 的倍数），
+    并同步滑动条。供 applyStyle 初始化与滑条 input 事件复用。 */
+function applyScale() {
+  const { state } = window.ClockState;
+  const scale = state.analogScale || 100;
+  document.documentElement.style.setProperty('--analog-scale', String(scale / 100));
+  const slider = document.getElementById('analog-scale-slider');
+  if (slider) slider.value = String(scale);
+}
+
+/** 表盘专属的面板行显隐：尺寸滑条与「显示数字时间」开关只在表盘风格下出现。
+    放在本文件而不是 ui/style.js —— 面板里哪些行属于表盘，由风格套件自己决定，
+    将来若表盘拆成独立页面，这段逻辑随之一起走。 */
+function syncPanelRows(style) {
+  const isAnalog = style === 'analog';
+  const scaleRow = document.getElementById('analog-scale-row');
+  if (scaleRow) scaleRow.hidden = !isAnalog;
+  const digitalRow = document.getElementById('analog-digital-toggle-row');
+  if (digitalRow) digitalRow.hidden = !isAnalog;
+}
+
 /* ---------- 命名空间导出 ---------- */
-window.ClockAnalog = { buildAnalogClockFace, updateAnalogClock };
+window.ClockAnalog = { buildAnalogClockFace, updateAnalogClock, applyScale, syncPanelRows };
 
 })();

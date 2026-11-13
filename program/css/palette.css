@@ -1,0 +1,234 @@
+/* ==========================================================================
+   配色预设（body[data-palette]）
+   颜色只由「预设 × 主题」两层决定，最后加载以保证覆盖顺序
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ==========================================================================
+   配色预设（color preset）—— 通过 body[data-palette] 属性驱动
+   ==========================================================================
+   说明：
+   - 颜色只有这一层来源：预设（浅色一档）+ 主题（深色一档，具体性更高）。
+     风格不再定义任何颜色变量（2026-11-12 移除霓虹风时一并清理），
+     因此不存在「风格覆盖配色」的优先级竞争。
+   - 切换配色只需设置 document.body.dataset.palette（js/palette.js），
+     无需刷新页面，所有使用 var(--xxx) 的元素实时更新。
+   - default 预设不在此定义，沿用 body 默认主题变量。
+   -------------------------------------------------------------------------- */
+
+/* ---------- 海洋（ocean）：青蓝冷色调 ---------- */
+body[data-palette="ocean"] {
+  color-scheme: light;
+  --bg-color: #eef4f6;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #ffffff 0%, #e2edf1 100%);
+  --text-color: #0f1a24;
+  --text-secondary: #4a6b7a;
+  --text-tertiary: #7d97a3;
+  --accent-color: #0e9fbd;
+  --accent-rgb: 14, 159, 189;
+  --panel-bg: #ffffff;
+  --panel-border: rgba(15, 26, 36, 0.08);
+  --panel-shadow: 0 24px 60px rgba(10, 40, 52, 0.18);
+  --control-bg: #e0ebef;
+  --control-hover: #d4e3e9;
+  --control-active: #c7dbe3;
+  --divider: rgba(15, 26, 36, 0.08);
+}
+body[data-palette="ocean"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #0a141c;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #13232d 0%, #081219 100%);
+  --text-color: #d9ecf4;
+  --text-secondary: #8fb3c2;
+  --text-tertiary: #55707e;
+  --accent-color: #35c3e2;
+  --accent-rgb: 53, 195, 226;
+  --panel-bg: #0e1a24;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #16262f;
+  --control-hover: #1c303b;
+  --control-active: #223a46;
+  --divider: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- 落日（sunset）：橙紫暖色调 ---------- */
+body[data-palette="sunset"] {
+  color-scheme: light;
+  --bg-color: #faf3ee;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fff8f1 0%, #f5e7da 100%);
+  --text-color: #2a1810;
+  --text-secondary: #8a5a3f;
+  --text-tertiary: #b08a72;
+  --accent-color: #e8590c;
+  --accent-rgb: 232, 89, 12;
+  --panel-bg: #fffaf5;
+  --panel-border: rgba(42, 24, 16, 0.08);
+  --panel-shadow: 0 24px 60px rgba(120, 52, 16, 0.16);
+  --control-bg: #f3e5d8;
+  --control-hover: #ecd9c6;
+  --control-active: #e4cdb4;
+  --divider: rgba(42, 24, 16, 0.08);
+}
+body[data-palette="sunset"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #1a0e0a;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #2c1a10 0%, #140a06 100%);
+  --text-color: #ffe9d9;
+  --text-secondary: #d9a07a;
+  --text-tertiary: #8f5f42;
+  --accent-color: #ff7a3c;
+  --accent-rgb: 255, 122, 60;
+  --panel-bg: #2a180e;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #311e12;
+  --control-hover: #3a2517;
+  --control-active: #452b1c;
+  --divider: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- 森林（forest）：墨绿自然色 ---------- */
+body[data-palette="forest"] {
+  color-scheme: light;
+  --bg-color: #f0f4ee;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fbfdfa 0%, #e4ece0 100%);
+  --text-color: #16241a;
+  --text-secondary: #4d6b55;
+  --text-tertiary: #7d9683;
+  --accent-color: #2f9e44;
+  --accent-rgb: 47, 158, 68;
+  --panel-bg: #ffffff;
+  --panel-border: rgba(22, 36, 26, 0.08);
+  --panel-shadow: 0 24px 60px rgba(22, 58, 32, 0.16);
+  --control-bg: #e1e9de;
+  --control-hover: #d4e0d0;
+  --control-active: #c7d7c2;
+  --divider: rgba(22, 36, 26, 0.08);
+}
+body[data-palette="forest"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #0c150e;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #15251a 0%, #08120b 100%);
+  --text-color: #dff0e3;
+  --text-secondary: #93b59c;
+  --text-tertiary: #5a7a63;
+  --accent-color: #51cf66;
+  --accent-rgb: 81, 207, 102;
+  --panel-bg: #0e1c12;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #16261b;
+  --control-hover: #1c3022;
+  --control-active: #223a29;
+  --divider: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- 樱花（sakura）：粉紫浪漫色 ---------- */
+body[data-palette="sakura"] {
+  color-scheme: light;
+  --bg-color: #faf2f6;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fff8fb 0%, #f4e5ee 100%);
+  --text-color: #2a1524;
+  --text-secondary: #8a5f7c;
+  --text-tertiary: #b28ca6;
+  --accent-color: #d6336c;
+  --accent-rgb: 214, 51, 108;
+  --panel-bg: #fffafd;
+  --panel-border: rgba(42, 21, 36, 0.08);
+  --panel-shadow: 0 24px 60px rgba(120, 30, 80, 0.16);
+  --control-bg: #f3e5ed;
+  --control-hover: #ecd9e3;
+  --control-active: #e5ccd9;
+  --divider: rgba(42, 21, 36, 0.08);
+}
+body[data-palette="sakura"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #180e16;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #291a24 0%, #120a10 100%);
+  --text-color: #fce6f1;
+  --text-secondary: #d69abf;
+  --text-tertiary: #8f5f7e;
+  --accent-color: #f06595;
+  --accent-rgb: 240, 101, 149;
+  --panel-bg: #281622;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #2d1b27;
+  --control-hover: #36202e;
+  --control-active: #402636;
+  --divider: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- 石墨（graphite）：黑白灰极简 ---------- */
+body[data-palette="graphite"] {
+  color-scheme: light;
+  --bg-color: #f5f5f5;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fdfdfd 0%, #ebebeb 100%);
+  --text-color: #161616;
+  --text-secondary: #5f5f5f;
+  --text-tertiary: #8f8f8f;
+  --accent-color: #4d4d4d;
+  --accent-rgb: 77, 77, 77;
+  --panel-bg: #ffffff;
+  --panel-border: rgba(22, 22, 22, 0.08);
+  --panel-shadow: 0 24px 60px rgba(22, 22, 22, 0.16);
+  --control-bg: #e7e7e7;
+  --control-hover: #dddddd;
+  --control-active: #d3d3d3;
+  --divider: rgba(22, 22, 22, 0.08);
+}
+body[data-palette="graphite"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #101010;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #1b1b1b 0%, #0a0a0a 100%);
+  --text-color: #f0f0f0;
+  --text-secondary: #ababab;
+  --text-tertiary: #6b6b6b;
+  --accent-color: #c9c9c9;
+  --accent-rgb: 201, 201, 201;
+  --panel-bg: #1a1a1a;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #1e1e1e;
+  --control-hover: #262626;
+  --control-active: #2e2e2e;
+  --divider: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- 紫晶（amethyst）：紫色系 ---------- */
+body[data-palette="amethyst"] {
+  color-scheme: light;
+  --bg-color: #f3f1fa;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #fbfaff 0%, #e7e3f5 100%);
+  --text-color: #1e1830;
+  --text-secondary: #61599a;
+  --text-tertiary: #8f87bd;
+  --accent-color: #7048e8;
+  --accent-rgb: 112, 72, 232;
+  --panel-bg: #ffffff;
+  --panel-border: rgba(30, 24, 48, 0.08);
+  --panel-shadow: 0 24px 60px rgba(52, 34, 120, 0.18);
+  --control-bg: #e6e2f2;
+  --control-hover: #dad4ec;
+  --control-active: #cec6e5;
+  --divider: rgba(30, 24, 48, 0.08);
+}
+body[data-palette="amethyst"][data-theme="dark"] {
+  color-scheme: dark;
+  --bg-color: #100d1e;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #1e1930 0%, #0b0916 100%);
+  --text-color: #e8e3fb;
+  --text-secondary: #a79fdd;
+  --text-tertiary: #6d65a0;
+  --accent-color: #9775fa;
+  --accent-rgb: 151, 117, 250;
+  --panel-bg: #1a162e;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #221c3a;
+  --control-hover: #2a2347;
+  --control-active: #322a54;
+  --divider: rgba(255, 255, 255, 0.08);
+}

@@ -31,6 +31,7 @@ const state = {
   weights: {},             // { minimal: 200, analog: 400 }
   digitGaps: {},           // { minimal: 0, analog: 0 } 数字间距（em，负值=字符层叠；冒号间距由此联动派生）
   glow: 'on',              // 数字发光开关：'on' | 'off'（开启即冷光灯管效果）
+  uiOpen: {},              // 设置面板各分组的展开状态：{ clock: true, data: false, ... }（只影响 UI）
   weather: null,           // 最近一次天气数据
   weatherTimestamp: 0,
   location: null,          // 最近一次定位
@@ -84,6 +85,16 @@ function loadState() {
       if (!STYLE_CONFIGS[key]) { delete state[map][key]; dirty = true; }
     }
   }
+  // 面板折叠状态：只接受布尔值，未知分组键丢弃（避免旧存档污染 DOM 的 data-open）
+  if (state.uiOpen && typeof state.uiOpen === 'object') {
+    const clean = {};
+    Object.keys(state.uiOpen).forEach((k) => {
+      if (typeof state.uiOpen[k] === 'boolean' && /^[a-z]{3,10}$/.test(k)) clean[k] = state.uiOpen[k];
+    });
+    state.uiOpen = clean;
+  } else {
+    state.uiOpen = {};
+  }
   if (dirty) saveState();
 }
 
@@ -105,6 +116,7 @@ function saveState() {
       globalZoom: state.globalZoom,
       analogScale: state.analogScale,
       glow: state.glow,
+      uiOpen: state.uiOpen,
       fonts: state.fonts,
       sizes: state.sizes,
       weights: state.weights,

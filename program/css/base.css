@@ -1,0 +1,100 @@
+/* ==========================================================================
+   基础层：变量 / 重置 / 主布局
+   所有其他样式文件都建立在它之上（变量定义在这里）
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ==========================================================================
+   Fullscreen Web Clock - styles.css
+   ========================================================================== */
+
+/* ---------- 1. Reset & Base ---------- */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  /* 原生控件（下拉列表弹出层、滚动条等）默认按浅色渲染，深色模式在下方覆盖 */
+  color-scheme: light;
+  /* 主题变量（浅色为默认值，深色在下方覆盖） */
+  --bg-color: #f2f3f7;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #ffffff 0%, #eef0f6 100%);
+  --text-color: #14151c;
+  --text-secondary: #6b7180;
+  --text-tertiary: #9aa0ae;
+  --accent-color: #3b82f6;
+  --accent-rgb: 59, 130, 246;
+  /* 时间数字主色：以主色为倾向的文字色（accent 30% + text 70%），
+     使数字在浅/深模式、各配色预设下都带明显而协调的色彩倾向；
+     color-mix 引用变量时在 .time-display 使用点求值，故自动跟随
+     配色预设覆盖后的 --accent-color / --text-color；
+     不支持 color-mix 的旧浏览器忽略该声明 → 回退 var(--text-color) */
+  --digit-color: color-mix(in srgb, var(--accent-color) 30%, var(--text-color));
+  --panel-bg: #ffffff;
+  --panel-border: rgba(20, 21, 28, 0.08);
+  --panel-shadow: 0 24px 60px rgba(20, 21, 28, 0.16);
+  --control-bg: #eceef4;
+  --control-hover: #e0e4ee;
+  --control-active: #d4d9e6;
+  --divider: rgba(20, 21, 28, 0.08);
+
+  background: var(--bg-gradient);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  transition: background-color 0.6s ease, color 0.6s ease;
+}
+
+body[data-theme="dark"] {
+  /* 深色模式下原生控件按深色渲染，避免浅色系统列表 + 亮字看不清 */
+  color-scheme: dark;
+  --bg-color: #0d0e16;
+  --bg-gradient: radial-gradient(ellipse at 50% 20%, #16182a 0%, #0a0b12 100%);
+  --text-color: #e8eaf2;
+  --text-secondary: #a8adbd;
+  --text-tertiary: #63697c;
+  --accent-color: #6aa6ff;
+  --accent-rgb: 106, 166, 255;
+  --panel-bg: #1a1c2c;
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  --control-bg: #22243a;
+  --control-hover: #2b2e4a;
+  --control-active: #343860;
+  --divider: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- 2. 主布局 ---------- */
+
+#clock-app {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  --clock-gap: clamp(12px, 3vh, 36px);
+  gap: var(--clock-gap);
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+           max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  /* 关键元素不溢出 */
+  min-width: 0;
+  min-height: 0;
+}
+

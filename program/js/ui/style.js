@@ -1,5 +1,7 @@
 /* ==========================================================================
-   style.js - 时钟风格管理（切换风格、应用字体/字号/字重到 CSS 变量）
+   style.js - 风格切换编排（切换风格、应用字体/字号/字重到 CSS 变量）
+   表盘专属的状态应用（尺寸缩放、面板行显隐）由 styles/analog.js 负责，
+   本文件不直接操作表盘 DOM（2026-11-13 分层）。
    经典脚本模式：依赖 utils.js（ClockUtils）、state.js（ClockState）、
    config.js（ClockConfig）、clock.js（ClockRender）、fonts.js（ClockFonts，需先加载）
    导出挂载到 window.ClockStyle
@@ -30,14 +32,11 @@ function applyStyle(style, { persist = true } = {}) {
   // 编程设 value 不触发 change，需手动同步自定义下拉的 trigger 文本与高亮
   if (window.ClockSelect) window.ClockSelect.syncAll();
 
-  // 「模拟表盘显示数字时间」开关仅在该风格下显示
-  const toggleRow = $('#analog-digital-toggle-row');
-  if (toggleRow) toggleRow.hidden = style !== 'analog';
-
-  // 「表盘尺寸」滑动条仅在该风格下显示，并应用缩放系数到 CSS 变量
-  const scaleRow = $('#analog-scale-row');
-  if (scaleRow) scaleRow.hidden = style !== 'analog';
-  applyAnalogScale();
+  // 表盘专属的面板行显隐 + 尺寸缩放，交给风格套件自己处理
+  if (window.ClockAnalog) {
+    window.ClockAnalog.syncPanelRows(style);
+    window.ClockAnalog.applyScale();
+  }
 
   // 应用该风格的字体设置
   applyFontSettings(style);
@@ -46,15 +45,6 @@ function applyStyle(style, { persist = true } = {}) {
 
   // 通知生命周期模块：表针动画按需启停（仅 analog 逐帧驱动）+ 重算信息栏贴靠位置
   window.dispatchEvent(new CustomEvent('clock:style-applied', { detail: { style } }));
-}
-
-/** 将表盘尺寸缩放系数（state.analogScale，百分比）应用到 --analog-scale（数字 0.5-2），
-    并同步滑动条（供 applyStyle 初始化与滑动条事件复用） */
-function applyAnalogScale() {
-  const scale = state.analogScale || 100;
-  document.documentElement.style.setProperty('--analog-scale', String(scale / 100));
-  const slider = $('#analog-scale-slider');
-  if (slider) slider.value = String(scale);
 }
 
 /** 只把字体/字号/字重/间距写入 CSS 变量（高频路径）。
@@ -162,6 +152,6 @@ function applyFontSettings(style = state.style) {
 }
 
 /* ---------- 命名空间导出 ---------- */
-window.ClockStyle = { applyStyle, applyFontSettings, applyFontVars, applyAnalogScale };
+window.ClockStyle = { applyStyle, applyFontSettings, applyFontVars };
 
 })();

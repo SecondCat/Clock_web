@@ -1,0 +1,56 @@
+/* ==========================================================================
+   信息条：日期 + 天气
+   两种风格共用
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ---------- 4. 信息条（日期 + 天气） ---------- */
+
+.info-bar {
+  /* 贴靠在主视觉（数字时间/表盘）下方：top 由 JS 计算 --main-bottom（主视觉
+     底部相对视口的位置）+ --clock-gap（间隙），水平居中 —— 不固定底部，
+     随主视觉高度（字号/表盘尺寸）动态跟随 */
+  position: absolute;
+  top: calc(var(--main-bottom, 50%) + var(--clock-gap, 32px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 24px);
+  /* 字号由设置面板「日期天气字号」滑动条控制（--info-font-size，px），
+     以 4vw 为上限：信息栏内容约 20 字符，4vw 让内容在窄屏下仍可读且不溢出 */
+  font-size: min(var(--info-font-size, 16px), 4vw);
+  color: var(--text-secondary);
+  font-weight: 300;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  /* 宽度不限制（不换行、不溢出）；水平居中 + 不 wrap */
+  max-width: none;
+  flex-wrap: nowrap;
+  text-align: center;
+}
+
+/* 日期/天气显示开关：关闭日期或天气时隐藏对应元素；
+   info-bar 为 flex justify-content:center，剩余元素自动居中 */
+body[data-show-date="off"] .date-display,
+body[data-show-weather="off"] .weather-display {
+  display: none;
+}
+
+.weather-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.weather-icon {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.weather-text {
+  font-variant-numeric: tabular-nums;
+}
+

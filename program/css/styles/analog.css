@@ -1,0 +1,139 @@
+/* ==========================================================================
+   风格套件 · 模拟表盘（analog）
+   表盘本体与表盘风格下的几何覆写；横竖屏内的额外汇覆写在 css/responsive.css
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ==========================================================================
+   风格 2：经典模拟表盘（analog）
+   ========================================================================== */
+
+/* 模拟表盘容器：analog 风格下作为主视觉，绝对定位铺满屏幕并居中 →
+   表盘严格对齐 X/Y 轴中心（数字时间在表盘下方、信息条在底部） */
+.analog-container {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+body[data-style="analog"] .analog-container {
+  display: flex;
+  position: absolute;
+  inset: 0;
+}
+
+/* analog 下数字时间不再居中，而是定位在表盘正下方（表盘半高 + gap） */
+body[data-style="analog"] .digital-container {
+  top: calc(50% + min(calc(26vh * var(--analog-scale, 1)), calc(35vw * var(--analog-scale, 1))) + var(--clock-gap));
+  bottom: auto;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.analog-clock {
+  /* 宽度由视口比例主导（高度为主、宽度为辅），乘以 --analog-scale 缩放系数
+     （设置面板「表盘尺寸」滑动条控制，默认 1）——纯 vh/vw 比例、无固定像素上限，
+     窗口大小改变时表盘跟随比例缩放而非固定像素大小 */
+  width: min(calc(52vh * var(--analog-scale, 1)), calc(70vw * var(--analog-scale, 1)));
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  overflow: visible;
+  /* 表盘文字/刻度/表针统一经 color（var 兼容所有浏览器）+ currentColor 继承主题色，
+     规避部分浏览器在 SVG fill/stroke 中直接使用 var() 失效导致深色模式下文字不可读 */
+  color: var(--text-color);
+}
+
+/* 表盘元素 —— 颜色全部经 currentColor 传入（各元素 color 已在 HTML 内联样式或上方容器中定义） */
+.clock-face-outer {
+  fill: currentColor;   /* color 来自内联 style="color: var(--bg-color)" */
+  stroke: var(--text-secondary);
+  stroke-width: 1.5;
+  opacity: 0.9;
+}
+
+.clock-face-inner {
+  fill: currentColor;   /* color 来自内联 style="color: var(--bg-color)" */
+  stroke: var(--divider);
+  stroke-width: 1;
+  fill-opacity: 0.35;
+}
+
+.minute-tick {
+  stroke: currentColor; /* color 来自 <g id="minute-ticks"> 内联 style="color: var(--text-tertiary)" */
+  stroke-width: 1.2;
+  opacity: 0.7;
+}
+
+.hour-marker {
+  stroke: currentColor; /* color 继承自 .analog-clock */
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.hour-number {
+  fill: currentColor;   /* color 继承自 .analog-clock（深色模式下为亮色，可读性不受 SVG var() 兼容性影响） */
+  font-family: 'Cinzel', 'Playfair Display', serif;
+  font-size: 26px;
+  font-weight: 400;
+  text-anchor: middle;
+  dominant-baseline: central;
+  opacity: 0.9;
+}
+
+.hour-hand,
+.minute-hand {
+  stroke: currentColor; /* color 继承自 .analog-clock */
+  stroke-linecap: round;
+}
+
+.hour-hand {
+  stroke-width: 9;
+}
+
+.minute-hand {
+  stroke-width: 6;
+  opacity: 0.85;
+}
+
+.second-hand {
+  stroke: currentColor; /* color 来自内联 style="color: var(--accent-color)" */
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.clock-center-outer {
+  fill: currentColor;   /* color 来自内联 style="color: var(--bg-color)" */
+  stroke: var(--accent-color);
+  stroke-width: 2;
+}
+
+.clock-center-inner {
+  fill: currentColor;   /* color 来自内联 style="color: var(--accent-color)" */
+}
+
+/* analog 风格下数字时间缩小，置于表盘下方 */
+body[data-style="analog"] .time-display {
+  --clock-size-cap: 40px;
+  --clock-size-vw: 8;
+  --clock-size-vh: 10;
+  /* 模拟表盘下秒数略大、下移量更小（覆盖 --seconds-scale/--seconds-shift，
+     定位 margin-top 公式自动适配，无需单独改 margin） */
+  --seconds-scale: 0.42;
+  --seconds-font-size: 0.42em;
+  --seconds-shift: 0.12em;
+}
+
+/* analog 风格：数字时间显示开关关闭时，隐藏整个数字时间区域 */
+body[data-style="analog"][data-analog-digital="off"] .digital-container {
+  display: none;
+}
+
+body[data-style="analog"] .info-bar {
+}
+

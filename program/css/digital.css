@@ -1,0 +1,204 @@
+/* ==========================================================================
+   数字时间：容器 / 冒号锚定 / 时分组 / 秒数单元 / 数字槽位
+   表盘风格同样复用（可显示数字时间）
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ---------- 3. 数字时间 ---------- */
+
+.digital-container {
+  /* 数字时间作为主视觉：绝对定位铺满屏幕并居中 → 严格对齐 X/Y 轴中心 */
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.time-display {
+  /* 由 JS 动态设置 --clock-font 与 --clock-font-size；
+     min() 视口约束保证任何字号下都不溢出 */
+  font-family: var(--clock-font, 'Inter', sans-serif);
+  /* 三段约束统一走变量：--clock-size-cap 为字号上限，--clock-size-vw/vh 为
+     视口比例系数（无单位数字）。横竖屏媒体查询只覆盖这两个系数，
+     不再重复整条 font-size（旧实现有 9 处重复声明，改动时极易漏改） */
+  font-size: min(
+    var(--clock-font-size, var(--clock-size-cap, 96px)),
+    calc(var(--clock-size-vw, 20) * 1vw / var(--zoom-factor, 1)),
+    calc(var(--clock-size-vh, 28) * 1vh / var(--zoom-factor, 1))
+  );
+  font-weight: var(--clock-font-weight, 200);
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  /* 时间数字颜色：带主色倾向的强调色（由 body --digit-color 提供，
+     自动跟随浅/深模式与配色预设；不支持 color-mix 时回退 text-color）。
+     冒号继承同色，与数字协调；秒数/AM/PM 由各自规则设为次要色 */
+  color: var(--digit-color, var(--text-color));
+  /* 锚点布局：容器铺满数字区全宽，子元素全部绝对定位，左右两侧均以
+     50%（视口中线）为基准向两侧展开 —— 以冒号为基准锚定时/分/秒，
+     右侧内容（秒数、AM/PM）宽度变化不再影响左侧时/分的位置 */
+  position: relative;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  /* 上下对称 padding 撑起容器高度（恰好一行行高 1.05em），数字行垂直
+     居中于容器 → top:50% 即数字行中心（与冒号 Y 轴基准一致） */
+  padding-top: 0.525em;
+  padding-bottom: 0.525em;
+  /* 秒数单元参数（本容器为主字号上下文，所有定位 calc 的 em 均相对主字号）：
+     --seconds-scale 秒数字号相对主字号比例（数字，供 margin-top 乘法）；
+     --seconds-font-size 秒数字号（长度，供 font-size 直接使用 —— 注意
+       font-size 不接受无单位数字值，var() 替换纯数字会被浏览器丢弃）；
+     --seconds-shift 秒数相对自身字号的下移量。
+     缩放职责由 .seconds 承担（.seconds-wrapper 保持主字号，保证 left/margin-top
+     中的 em 单位正确），analog / 横屏矮屏只需覆盖这三个变量 */
+  --seconds-scale: 0.28;
+  --seconds-font-size: 0.28em;
+  --seconds-shift: 0.28em;
+}
+
+.time-display .hours,
+.time-display .minutes {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 冒号：绝对定位于 time-display 的水平/垂直中点。
+   - X 轴：.digital-container 已将 time-display 整体水平居中（左缘到视口中线
+     距离 = 右缘到视口中线距离），left:50% 即视口水平中点 → 无论小时位数、
+     秒数、AM/PM 是否存在、字号多大，冒号中心始终严格对齐屏幕 X 轴中点；
+   - Y 轴：top:50% 以实际显示区域（time-display 内容盒 = 数字行盒高度）为
+     基准自适应居中，任意屏幕尺寸/分辨率下位置恒定。
+   translateY(-52%) 为光学微调（冒号字形视觉中心通常略低于数字字形中心）。 */
+.time-display .colon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -52%);
+  margin: 0;
+  /* 最上层（安全网）：时/分数字锚定在 --clock-colon-gap（≥0.2em）空隙之外、
+     永不到达冒号，此处确保任何叠加/层叠情况下冒号始终完整可见 */
+  z-index: 1000;
+}
+
+/* 时/分数字组：以冒号为基准锚定左右。
+   - 右/左缘 = 冒号中心 ± var(--clock-colon-gap) 冒号空隙（由数字间距滑块联动
+     派生：colonGap = clamp(0.3 + gap*0.25, 0.2, 0.6)，默认 0.3em；方向与数字
+     间距一致（数字拉开冒号同步外移、层叠时收敛），下限 0.2em 已考虑冒号自身
+     宽度，保证任何间距下数字都不会与冒号重叠或覆盖冒号）：
+       · --clock-colon-gap：冒号 ↔ 时/分数字组的空隙（时、分、秒整体联动）
+       · --clock-digit-gap：组内数字之间间隔（负值=字符层叠），只影响组内
+   - margin-top: -0.525em（= 半行高，em 相对自身字号）把行盒中心对齐容器
+     中线，垂直位置与原 flex 布局保持一致 */
+.time-display .hours,
+.time-display .minutes {
+  position: absolute;
+  top: 50%;
+  margin: 0;
+  margin-top: -0.525em;
+}
+
+.time-display .hours {
+  right: calc(50% + var(--clock-colon-gap, 0.3em));
+}
+
+.time-display .minutes {
+  left: calc(50% + var(--clock-colon-gap, 0.3em));
+}
+
+/* 秒数 + AM/PM 单元：紧随分钟组右侧（左缘 = 分钟右缘 + 0.18em 基础空隙
+   + gap 联动，minutes 恒为 2 位，宽度 = 2 × 数字槽位 + 组内 1 个 gap）。
+   冒号空隙部分同样引用 var(--clock-colon-gap) —— 冒号间距变化时秒数整体
+   跟随分钟右缘联动，秒数自身间距恒定、与 AM/PM 保持一致，且永不与分钟/
+   冒号重叠。
+   font-size 保持主字号（缩放由内部 .seconds 承担），因此 left/margin-top
+   中的 em 均为主字号单位，与 .hours/.minutes/.digit 的间距变量一致 */
+.time-display .seconds-wrapper {
+  position: absolute;
+  top: 50%;
+  /* 距离分钟数的间距用 --clock-seconds-gap（随数字间距滑动条联动，见 style.js） */
+  left: calc(50% + var(--clock-colon-gap, 0.3em) + var(--clock-seconds-gap, 0.18em) + 2 * var(--clock-digit-width, 0.62em) + var(--clock-digit-gap, 0em));
+  /* 固定宽度 = 2 个数字槽位宽度（× 秒数缩放系数）：即使秒数隐藏（display:none）
+     wrapper 宽度仍保持恒定，AM/PM 的 left:50% 水平居中基准不随秒数开关漂移。
+     --clock-digit-width 为 em（相对主字号），--seconds-scale 为数字，相乘得长度 */
+  width: calc(2 * var(--clock-digit-width, 0.62em) * var(--seconds-scale, 0.32));
+  font-weight: 400;
+  /* 秒数取「主数字色的淡化版」：与主数字同色系，主次靠字号区分。
+     此前直接用 --text-secondary，但各配色预设的 text-secondary 色调强弱不一
+     → 星蓝下秒数偏中性灰、海洋/落日等偏彩色，看起来像两套系统。
+     第二个颜色用 --bg-color（而非透明）便于估对比度；
+     不支持 color-mix 的旧浏览器忽略第二行，回退到 text-secondary。 */
+  color: var(--text-secondary);
+  color: color-mix(in srgb, var(--digit-color) 76%, var(--bg-color));
+  opacity: 1;
+  /* 垂直：小字行盒中心 = 容器中线 + (--seconds-shift × --seconds-scale)，
+     等效原 align-self:center + translateY(0.28em)。用 margin-top 而非 transform ——
+     transform 会创建层叠上下文，使秒数无法与时/分数字按全局 z-index
+     层叠（要求最左在上、往右依次降低） */
+  margin-top: calc(-0.5 * var(--seconds-scale) * 1.05em + var(--seconds-shift) * var(--seconds-scale));
+  margin-left: 0;
+  /* AM/PM 定位包含块：absolute 后代在 margin 偏移后的坐标空间中定位，
+     因此 AM/PM 随秒数整体下移，12/24 小时制切换时秒数位置保持恒定 */
+}
+
+.time-display .seconds {
+  /* 块级：从 .seconds-wrapper 顶部排布，摆脱行内 baseline 下沉（否则会在
+     92px 行盒中按基线对齐，秒数被推到行盒底部、超出主显示行）；
+     wrapper 高度随之收缩为秒数字行高，使 margin-top 公式精确生效 */
+  display: block;
+  font-variant-numeric: tabular-nums;
+  /* 秒数字号缩放（相对主字号，长度值），仅缩放内部数字，不影响定位计算 */
+  font-size: var(--seconds-font-size);
+  /* 行高用数字（相对自身字号），与内部 .digit 一致，数字垂直居中 */
+  line-height: 1.05;
+}
+
+/* 每个数字独立槽位：同宽 + 居中，任意字体（含非等宽）下数字位置恒定、互不干扰；
+   --clock-digit-width 由 JS 按当前字体实测最宽数字（em 单位，随字号自适应）；
+   position:relative 为层叠基础（z-index 由 JS 按全局从左到右递减设置） */
+.time-display .digit {
+  display: inline-block;
+  width: var(--clock-digit-width, 0.62em);
+  text-align: center;
+  letter-spacing: 0;
+  position: relative;
+}
+
+/* 数字间距：仅时/分数字参与（--clock-digit-gap，em，可为负 → 字符层叠效果），
+   由设置面板滑动条调节，按风格独立持久化（JS 写入根变量）；
+   秒数间距固定为 0（不设 margin，不受滑杆影响），与 AM/PM 保持一致的稳定样式 */
+.time-display .hours .digit + .digit,
+.time-display .minutes .digit + .digit {
+  margin-left: var(--clock-digit-gap, 0em);
+}
+
+/* AM/PM 标识：绝对定位于秒数正上方居中，与秒数组成整体单元（不占文档流，
+   切换 12/24 小时制时秒数对齐完全不受影响） */
+.time-display .ampm {
+  position: absolute;
+  bottom: calc(100% + 0.18em);
+  left: 50%;
+  transform: translateX(-50%);
+  /* 字号与字重均与秒数一致（--seconds-font-size + font-weight 400），
+     保证 AM/PM 与秒数在视觉上属于同一单元 */
+  font-size: var(--seconds-font-size, 0.28em);
+  font-weight: 400;
+  /* 与秒数同色（两者视觉上是一个单元），同样由主数字色派生 */
+  color: var(--text-secondary);
+  color: color-mix(in srgb, var(--digit-color) 76%, var(--bg-color));
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+/* 秒数显示开关：关闭时只隐藏 .seconds（block 元素），保留 .seconds-wrapper
+   作为 AM/PM 的定位包含块 —— wrapper 高度归零后 AM/PM 的 bottom:calc(100%+0.18em)
+   仍锚定在秒数行顶上方，AM/PM 位置不变，实现秒数与 AM/PM 开关完全独立。
+   由设置面板开关控制（JS 写 body[data-show-seconds]），不影响冒号锚定的时/分布局 */
+body[data-show-seconds="off"] .time-display .seconds {
+  display: none;
+}
+

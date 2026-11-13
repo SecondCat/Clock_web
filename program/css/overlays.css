@@ -1,0 +1,304 @@
+/* ==========================================================================
+   浮层：字体提示条 / 全屏横幅 / 霓虹光效
+   三者都是覆盖在主视觉之上的层
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ==========================================================================
+   9. 字体加载状态提示（toast）
+   ========================================================================== */
+
+.font-toast {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100; /* 高于设置面板(80)与遮罩(70) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, 92vw);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-color);
+  animation: font-toast-in 0.25s ease;
+  pointer-events: auto;
+}
+
+.font-toast[hidden] {
+  display: none;
+}
+
+@keyframes font-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.font-toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.font-toast-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 加载中：CSS 圆环 spinner（替代静态图标）——显式 from/to 保证所有浏览器
+   从 0° 连续旋转到 360°（仅写 to 时起止矩阵相同，部分浏览器插值后视觉不动） */
+.font-toast[data-status="loading"] .font-toast-icon {
+  border: 2.5px solid rgba(var(--accent-rgb), 0.25);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: font-toast-spin 0.8s linear infinite;
+}
+
+@keyframes font-toast-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 手动刷新按钮（字体已下载但页面未自动更新时显示） */
+.font-toast-refresh {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-color);
+  border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent-color);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.font-toast-refresh:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.font-toast-refresh:active {
+  transform: scale(0.97);
+}
+
+/* 小屏下提示条收窄 */
+@media (max-width: 480px) {
+  .font-toast {
+    top: 10px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+  }
+
+  .font-toast-refresh {
+    width: 100%;
+  }
+}
+
+/* ==========================================================================
+   9.1 全屏保持横幅（意外退出全屏后的恢复提示）
+   ==========================================================================
+   - 只在「非用户操作」退出全屏时出现，5 秒倒计时后尝试自动恢复全屏
+   - position:fixed 且默认 hidden，不参与主视觉布局，不影响信息栏贴靠计算 */
+
+.fs-guard {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110; /* 高于字体提示条(100)与设置面板(80)，低于自定义下拉菜单(120) */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(640px, 92vw);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-shadow);
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-color);
+  animation: fs-guard-in 0.25s ease;
+}
+
+.fs-guard[hidden] {
+  display: none;
+}
+
+@keyframes fs-guard-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.fs-guard-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--accent-color);
+}
+
+.fs-guard-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 倒计时数字：等宽数字避免逐秒跳动时宽度抖动 */
+.fs-guard-count {
+  display: inline-block;
+  min-width: 1ch;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-color);
+}
+
+/* 显式补 hidden 规则：上面的 display:inline-block 会覆盖 [hidden] 的默认 display:none */
+.fs-guard-count[hidden] {
+  display: none;
+}
+
+.fs-guard-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border: 1.5px solid var(--accent-color);
+  border-radius: 8px;
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-color);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.fs-guard-btn:hover {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+.fs-guard-btn:active {
+  transform: scale(0.97);
+}
+
+.fs-guard-cancel {
+  border-color: var(--panel-border);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.fs-guard-cancel:hover {
+  background: var(--control-hover);
+  color: var(--text-color);
+}
+
+@media (max-width: 480px) {
+  .fs-guard {
+    top: 10px;
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    flex-wrap: wrap;
+  }
+
+  .fs-guard-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* ==========================================================================
+   9.2 数字发光（body[data-glow]）
+   ==========================================================================
+   结构：js/glow.js 把时间串复制成两组 × 三层绝对定位副本，每层一个高斯模糊、
+        各自不同不透明度，叠加后形成光晕；主文字不动。
+        · main 组：时 / 分 / 冒号（主字号）
+        · sub  组：秒数 + AM/PM（--seconds-scale 倍主字号）
+   为什么分两组：模糊半径以 em 表达，em 取的是 .time-display 主字号。秒数只有
+   0.28 倍主字号，沿用同一半径会让它的光晕相对自身字号放大 3.6 倍 —— 变成一团
+   糊光，与主数字锐利的管状光晕质感不同，两者交界处出现可见断层
+   （2026-11-12 用户反馈「秒数光晕与分数光晕之间撕裂」）。分组后 sub 组半径乘以
+   同一比例，整屏光晕质感一致。
+   为什么是三层：原霓虹的亮度集中在 0–15px（1px 处 ΔL 43.9、3px 32.0、
+   12px 4.4、20px 0.3），单层或两层拟合不出这条陡衰减，会变成「背景一团光」；
+   三层 5/13/30 的像素差 1.57%（两层 16/64 是 14.33%）。
+   为什么半径用 em：字号变化时光晕等比缩放；固定 px 会让小字号糊成一团、
+   大字号几乎看不见。92px 字号下即 5 / 13 / 30px。
+   为什么不再给副本加 translateZ(0)：副本升为独立合成层后，在非整数设备像素比
+   （Windows 125%/150% 缩放）下会与主文字的栅格化吸附点不同，产生半像素错位 ——
+   光晕与笔画边缘对不齐，看上去像被直线切开。filter 本身已隔离绘制，
+   去掉该声明后三组副本与主文字始终在同一次绘制中对齐（2026-11-12 修复）。
+   档位只有一个「开」：2026-11-12 按要求合并，开启即原 strong 参数
+   （不透明度 1 / 0.80 / 0.32），原 soft 档已移除。
+   副本颜色统一取主色，避免秒数与 AM/PM 的次要灰混进光晕（否则光里有灰字影）。
+   只在深色模式生效（2026-11-13）：浅色底上光晕会发灰发脏，用户要求浅色不发光。
+   限定写在显示开关上（body[data-glow="on"][data-theme="dark"]），节点仍保留 ——
+   切回深色/自动进入夜间时段即恢复，不必重建副本；浅色下 display:none 不参与绘制。 */
+
+.glow-dup {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  /* 主数字由 applyDigitStack() 写正数 z-index，本层 0 即位于其下 */
+  z-index: 0;
+  color: rgb(var(--accent-rgb));
+  /* 极简给 .time-display 加了一层黑色软投影，副本必须清掉，否则光晕发脏 */
+  text-shadow: none;
+  display: none;
+}
+
+.glow-dup * {
+  color: inherit;
+}
+
+/* 显示开关：仅深色模式（浅色下副本不绘制，见上方说明） */
+body[data-glow="on"][data-theme="dark"] .glow-dup {
+  display: block;
+}
+
+/* 主数字组：半径以主字号为准 */
+body[data-glow="on"] .glow-dup.main.d1 { filter: blur(0.054em); opacity: 1; }
+body[data-glow="on"] .glow-dup.main.d2 { filter: blur(0.141em); opacity: 0.80; }
+body[data-glow="on"] .glow-dup.main.d3 { filter: blur(0.326em); opacity: 0.32; }
+
+/* 次要单元组：半径乘以 --seconds-scale，与秒数字号的相对比例和主数字一致
+   （em 仍解析为主字号，故用 calc 相乘得到「秒数尺寸下的同一比例」） */
+body[data-glow="on"] .glow-dup.sub.d1 { filter: blur(calc(0.054em * var(--seconds-scale, 0.28))); opacity: 1; }
+body[data-glow="on"] .glow-dup.sub.d2 { filter: blur(calc(0.141em * var(--seconds-scale, 0.28))); opacity: 0.80; }
+body[data-glow="on"] .glow-dup.sub.d3 { filter: blur(calc(0.326em * var(--seconds-scale, 0.28))); opacity: 0.32; }
+
+/* 浅色模式下本开关不产生效果：文字压到次要色，提示「当前不生效」，
+   但仍可操作（改的是深色/夜间时段的表现，自动模式下不该被锁死）
+   — 2026-11-13 起浅色不再压低不透明度，而是完全不发光 */
+body[data-theme="light"] #glow-toggle-row .toggle-text {
+  color: var(--text-tertiary);
+}
+

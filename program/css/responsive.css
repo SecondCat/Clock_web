@@ -1,0 +1,144 @@
+/* ==========================================================================
+   横竖屏适配 + 无障碍（减少动画偏好）
+   只覆盖变量与几何，不再重复整条 font-size
+   本文件仅承载一个区块；
+   加载顺序即层叠顺序，不得调换（见 index.html）。
+/* ========================================================================== */
+
+/* ==========================================================================
+   7. 横竖屏适配
+   ========================================================================== */
+
+/* --- 竖屏：数字时间纵向堆叠、字号适配 --- */
+@media (orientation: portrait) {
+  #clock-app {
+    --clock-gap: clamp(10px, 3vh, 30px);
+  }
+
+  .time-display {
+    --clock-size-vw: 17;
+    --clock-size-vh: 30;
+  }
+
+  body[data-style="analog"] .time-display {
+    --clock-size-vw: 7;
+    --clock-size-vh: 9;
+  }
+
+  .info-bar {
+    }
+}
+
+/* --- 横屏：防止过高导致溢出，限制高度 --- */
+@media (orientation: landscape) and (max-height: 520px) {
+  .time-display {
+    --clock-size-vw: 26;
+    --clock-size-vh: 42;
+    /* 横屏矮屏下秒数收紧（覆盖 --seconds-scale/--seconds-font-size，定位公式自动适配） */
+    --seconds-scale: 0.3;
+    --seconds-font-size: 0.3em;
+  }
+
+  #clock-app {
+    --clock-gap: 6px;
+  }
+
+  body[data-style="analog"] .time-display {
+    --clock-size-vw: 12;
+    --clock-size-vh: 12;
+    /* analog 规则特异性 (0,2,1) 高于上方通用 .time-display (0,1,0)，
+       需同特异性重声明秒数收紧才能覆盖 0.42 */
+    --seconds-scale: 0.3;
+    --seconds-font-size: 0.3em;
+  }
+
+  body[data-style="analog"] .info-bar {
+    }
+}
+
+/* 超小屏设备（如智能手表尺寸） */
+@media (max-width: 320px) {
+  .time-display {
+    --clock-size-vw: 15;
+    --clock-size-vh: 28;
+  }
+
+  .info-bar {
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+/* 高度很矮的横屏：信息条紧凑（表盘尺寸仍由基础比例线性缩放，不在此限制） */
+@media (orientation: landscape) and (max-height: 380px) {
+  .info-bar {
+      gap: 8px;
+  }
+}
+
+/* 低分辨率屏幕（高度 ≤ 700px）：间距收紧，防止与文字重叠（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
+@media (max-height: 700px) {
+  body[data-style="analog"] #clock-app {
+    --clock-gap: clamp(6px, 1.5vh, 16px);
+  }
+
+  body[data-style="analog"] .time-display {
+    --clock-size-vw: 7;
+    --clock-size-vh: 8;
+  }
+
+  body[data-style="analog"] .info-bar {
+    }
+}
+
+/* 极矮屏幕（高度 ≤ 500px）：数字时间与信息条紧凑排列（表盘尺寸仍由基础比例线性缩放，不在此分段限制） */
+@media (max-height: 500px) {
+  body[data-style="analog"] #clock-app {
+    --clock-gap: 4px;
+  }
+
+  body[data-style="analog"] .time-display {
+    --clock-size-vw: 6;
+    --clock-size-vh: 7;
+  }
+
+  body[data-style="analog"] .info-bar {
+    }
+}
+
+/* 隐藏滚动条但保持可滚动（设置面板内） */
+.settings-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-body::-webkit-scrollbar-thumb {
+  background: var(--control-active);
+  border-radius: 3px;
+}
+
+.settings-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ==========================================================================
+   8. 无障碍：减少动画偏好
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  /* 加载指示器属于功能性动画（提示“正在加载”），需保持旋转，不受减少动画偏好影响 */
+  .font-toast[data-status="loading"] .font-toast-icon {
+    animation-duration: 0.8s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
+/* 深色模式下滚动条 */
+body[data-theme="dark"] .settings-body::-webkit-scrollbar-thumb {
+  background: #3a3e5c;
+}
+

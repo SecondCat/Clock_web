@@ -13,7 +13,21 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-  <link rel="stylesheet" href="styles.css">
+  <!-- 样式按职责拆分为 10 个文件：**加载顺序即层叠顺序，不要调换**。
+       base（变量/重置/布局）→ digital（数字时间）→ info-bar（日期天气）
+       → styles/*（风格套件：极简 / 表盘）→ transitions（切换过渡）
+       → panel（设置面板）→ responsive（横竖屏+无障碍）→ overlays（浮层）
+       → palette（配色预设，最后加载以保证覆盖顺序）。 -->
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/digital.css">
+  <link rel="stylesheet" href="css/info-bar.css">
+  <link rel="stylesheet" href="css/styles/minimal.css">
+  <link rel="stylesheet" href="css/styles/analog.css">
+  <link rel="stylesheet" href="css/transitions.css">
+  <link rel="stylesheet" href="css/panel.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/overlays.css">
+  <link rel="stylesheet" href="css/palette.css">
 </head>
 <body data-style="minimal" data-theme="light" data-theme-mode="auto">
 
@@ -83,150 +97,189 @@
 
     <div class="settings-body">
 
-      <!-- 风格选择 -->
-      <section class="setting-group">
-        <h3>时钟风格</h3>
-        <select id="style-select" class="setting-select" aria-label="时钟风格">
-          <option value="minimal">◧ 极简</option>
-          <option value="analog">◔ 表盘</option>
-        </select>
-        <!-- 数字发光：三层模糊副本，光紧贴笔画（见 js/glow.js、报告第 12 节） -->
-        <label class="toggle-row" id="glow-toggle-row">
-          <span class="toggle-text">数字发光</span>
-          <input type="checkbox" id="glow-toggle" class="toggle-switch">
-        </label>
-        <!-- 表盘尺寸缩放（仅 analog 风格下显示）：滑动条作为缩放系数，乘到 vh/vw 基础比例上 -->
-        <label class="setting-label" id="analog-scale-row" hidden>
-          <span class="label-text">表盘尺寸</span>
-          <input type="range" id="analog-scale-slider" class="setting-slider" min="50" max="200" step="5" value="100">
-        </label>
-        <!-- 数字时间显示开关（仅 analog 风格下显示） -->
-        <label class="toggle-row" id="analog-digital-toggle-row" hidden>
-          <span class="toggle-text">显示数字时间</span>
-          <input type="checkbox" id="analog-digital-toggle" class="toggle-switch" checked>
-        </label>
-        <!-- 日期/天气显示与字号：所有风格通用，始终显示（不受风格影响） -->
-        <label class="toggle-row" id="show-date-row">
-          <span class="toggle-text">显示日期</span>
-          <input type="checkbox" id="show-date-toggle" class="toggle-switch" checked>
-        </label>
-        <label class="toggle-row">
-          <span class="toggle-text">显示天气</span>
-          <input type="checkbox" id="show-weather-toggle" class="toggle-switch" checked>
-        </label>
-        <label class="setting-label">
-          <span class="label-text">日期天气字号</span>
-          <input type="range" id="info-font-slider" class="setting-slider" min="10" max="28" step="1" value="16">
-        </label>
-      </section>
+      <!-- 分组规范（2026-11-13 改版）：每个分组是一张可折叠卡片。
+           head 里三个元素必须有：.setting-group-title（标题）、.setting-group-sum（当前值摘要，
+           由 ui/panel-groups.js 渲染）、.setting-group-chev（折叠箭头）。
+           data-open 表示展开状态，由 panel-groups.js 读写并持久化到 state.uiOpen。 -->
 
-        <!-- 配色预设（js/palette.js 动态填充选项；颜色变量见 styles.css 末尾
-             body[data-palette] 规则，浅/深模式自动联动） -->
-        <section class="setting-group">
-          <h3>配色预设</h3>
-          <select id="palette-select" class="setting-select" aria-label="配色预设"></select>
-        </section>
-
-        <!-- 时间格式 -->
-      <section class="setting-group">
-        <h3>时间格式</h3>
-        <div class="toggle-group" role="radiogroup" aria-label="时间格式">
-          <button class="format-option" data-format="24" role="radio" aria-checked="true">24 小时制</button>
-          <button class="format-option" data-format="12" role="radio" aria-checked="false">12 小时制</button>
-        </div>
-        <label class="toggle-row">
-          <span class="toggle-text">显示秒数</span>
-          <input type="checkbox" id="show-seconds-toggle" class="toggle-switch" checked>
-        </label>
-        <label class="toggle-row">
-          <span class="toggle-text">显示 AM/PM</span>
-          <input type="checkbox" id="show-ampm-toggle" class="toggle-switch" checked>
-        </label>
-        <p class="setting-hint">「显示 AM/PM」仅 12 小时制下生效；关闭秒数或 AM/PM 后时/分显示不受影响。</p>
-      </section>
-
-      <!-- 主题模式 -->
-      <section class="setting-group">
-        <h3>深色 / 浅色模式</h3>
-        <div class="toggle-group" role="radiogroup" aria-label="主题模式">
-          <button class="theme-option" data-mode="auto" role="radio" aria-checked="true">🌗 自动</button>
-          <button class="theme-option" data-mode="light" role="radio" aria-checked="false">☀ 浅色</button>
-          <button class="theme-option" data-mode="dark" role="radio" aria-checked="false">🌙 深色</button>
-        </div>
-        <p class="setting-hint" id="auto-theme-hint">自动模式：6:00 – 18:00 浅色，其余时间深色</p>
-      </section>
-
-      <!-- 字体设置（按风格独立） -->
-      <section class="setting-group" id="font-settings">
-        <h3>字体设置 <span class="current-style-label" id="current-style-label"></span></h3>
-        <label class="setting-label">
-          <span class="label-text">字体</span>
-          <select id="font-family-select" class="setting-select"></select>
-        </label>
-        <label class="setting-label">
-          <span class="label-text">字号</span>
-          <input type="range" id="font-size-slider" class="setting-slider" min="24" max="160" step="2" value="80">
-        </label>
-        <label class="setting-label">
-          <span class="label-text">字重</span>
-          <input type="range" id="font-weight-slider" class="setting-slider" min="100" max="900" step="100" value="400">
-        </label>
-        <label class="setting-label">
-          <span class="label-text">数字间距</span>
-          <input type="range" id="digit-gap-slider" class="setting-slider" min="-0.6" max="0.8" step="0.05" value="0">
-        </label>
-        <button id="clear-font-cache-btn" class="action-btn">🗑 清空字体缓存</button>
-        <p class="setting-hint" id="font-cache-hint">缓存可加速字体加载，无需联网即可使用。如遇字体显示异常可清空后重新加载。</p>
-      </section>
-
-      <!-- 时间同步（网络校准） -->
-      <section class="setting-group">
-        <h3>时间同步</h3>
-        <label class="toggle-row">
-          <span class="toggle-text">自动校准网络时间</span>
-          <input type="checkbox" id="auto-sync-toggle" class="toggle-switch" checked>
-        </label>
-        <p class="sync-status" id="sync-status">正在校准…</p>
-        <button id="resync-btn" class="action-btn">↻ 立即校准</button>
-        <p class="setting-hint">开启后自动从网络时间源校准（对齐 time.is 等网络时钟）；关闭则始终使用本地系统时间。</p>
-      </section>
-
-      <!-- 天气 -->
-      <section class="setting-group">
-        <h3>天气</h3>
-        <label class="setting-label">
-          <span class="label-text">数据源</span>
-          <select id="weather-source-select" class="setting-select" aria-label="天气数据源">
-            <option value="auto">自动（多源回退）</option>
-            <option value="amap">高德（中国区实况，需 API Key）</option>
-            <option value="ecmwf">ECMWF（Open-Meteo 模型）</option>
-            <option value="gfs">GFS（Open-Meteo 模型）</option>
-            <option value="cma">CMA 中国气象局（可能不稳定）</option>
-            <option value="wttr">wttr.in（无需 Key）</option>
+      <!-- 1. 时钟风格 -->
+      <section class="setting-group" data-group="clock" data-open="true">
+        <button class="setting-group-head" type="button" aria-expanded="true" aria-controls="group-body-clock">
+          <span class="setting-group-title">时钟风格</span>
+          <span class="setting-group-sum" data-sum="clock"></span>
+          <span class="setting-group-chev" aria-hidden="true"></span>
+        </button>
+        <div class="setting-group-body" id="group-body-clock">
+          <select id="style-select" class="setting-select" aria-label="时钟风格">
+            <option value="minimal">◧ 极简</option>
+            <option value="analog">◔ 表盘</option>
           </select>
-        </label>
-        <p class="setting-hint">自动模式按 高德 → ECMWF → GFS → wttr.in 顺序回退，直到成功；指定单一数据源时只使用该源。</p>
-        <p class="setting-hint" id="cma-warning" hidden>⚠ CMA 数据源（中国气象局 GRAPES 全球模型）可能因服务超负荷而不稳定，如遇异常请切换其他数据源。</p>
-        <label class="setting-label">
-          <span class="label-text">高德 API Key（可选）</span>
-          <input type="password" id="amap-key" class="setting-input" placeholder="粘贴高德 Web 服务 Key" autocomplete="off" spellcheck="false">
-        </label>
-        <p class="setting-hint" id="amap-key-hint">选择「高德」数据源时必须填写此 Key；Key 仅保存在本机浏览器。</p>
-        <p class="weather-status" id="weather-status">尚未获取天气数据</p>
-        <button id="refresh-weather" class="action-btn">↻ 刷新天气</button>
+          <!-- 表盘尺寸缩放（仅 analog 风格下显示）：滑动条作为缩放系数，乘到 vh/vw 基础比例上 -->
+          <label class="setting-label" id="analog-scale-row" hidden>
+            <span class="label-text">表盘尺寸</span>
+            <input type="range" id="analog-scale-slider" class="setting-slider" data-unit="%" min="50" max="200" step="5" value="100">
+          </label>
+          <!-- 数字时间显示开关（仅 analog 风格下显示） -->
+          <label class="toggle-row" id="analog-digital-toggle-row" hidden>
+            <span class="toggle-text">显示数字时间</span>
+            <input type="checkbox" id="analog-digital-toggle" class="toggle-switch" checked>
+          </label>
+          <!-- 日期/天气显示与字号：所有风格通用，始终显示（不受风格影响） -->
+          <label class="toggle-row" id="show-date-row">
+            <span class="toggle-text">显示日期</span>
+            <input type="checkbox" id="show-date-toggle" class="toggle-switch" checked>
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-text">显示天气</span>
+            <input type="checkbox" id="show-weather-toggle" class="toggle-switch" checked>
+          </label>
+          <label class="setting-label">
+            <span class="label-text">日期天气字号</span>
+            <input type="range" id="info-font-slider" class="setting-slider" data-unit="px" min="10" max="28" step="1" value="16">
+          </label>
+        </div>
       </section>
 
-      <!-- 显示 -->
-      <section class="setting-group">
-        <h3>显示</h3>
-        <div class="zoom-control">
-          <span class="label-text">全局缩放 <span class="slider-value" id="zoom-value">100%</span></span>
-          <div class="zoom-buttons">
-            <button id="zoom-out-btn" class="zoom-btn" aria-label="缩小" title="缩小">−</button>
-            <button id="zoom-in-btn" class="zoom-btn" aria-label="放大" title="放大">＋</button>
-          </div>
+      <!-- 2. 字体（按风格独立） -->
+      <section class="setting-group" id="font-settings" data-group="font" data-open="true">
+        <button class="setting-group-head" type="button" aria-expanded="true" aria-controls="group-body-font">
+          <span class="setting-group-title">字体 <span class="current-style-label" id="current-style-label"></span></span>
+          <span class="setting-group-sum" data-sum="font"></span>
+          <span class="setting-group-chev" aria-hidden="true"></span>
+        </button>
+        <div class="setting-group-body" id="group-body-font">
+          <label class="setting-label">
+            <span class="label-text">字体</span>
+            <select id="font-family-select" class="setting-select"></select>
+          </label>
+          <label class="setting-label">
+            <span class="label-text">字号</span>
+            <input type="range" id="font-size-slider" class="setting-slider" data-unit="px" min="24" max="160" step="2" value="80">
+          </label>
+          <label class="setting-label">
+            <span class="label-text">字重</span>
+            <input type="range" id="font-weight-slider" class="setting-slider" data-unit="" min="100" max="900" step="100" value="400">
+          </label>
+          <label class="setting-label">
+            <span class="label-text">数字间距</span>
+            <input type="range" id="digit-gap-slider" class="setting-slider" data-unit="em" min="-0.6" max="0.8" step="0.05" value="0">
+          </label>
+          <button id="clear-font-cache-btn" class="action-btn">🗑 清空字体缓存</button>
+          <p class="setting-hint" id="font-cache-hint">缓存可加速字体加载；如遇显示异常可清空重载。</p>
         </div>
-        <button id="fullscreen-btn" class="action-btn">⛶ 切换全屏</button>
+      </section>
+
+      <!-- 3. 外观（配色 / 深浅 / 光效） -->
+      <section class="setting-group" data-group="look" data-open="true">
+        <button class="setting-group-head" type="button" aria-expanded="true" aria-controls="group-body-look">
+          <span class="setting-group-title">外观</span>
+          <span class="setting-group-sum" data-sum="look"></span>
+          <span class="setting-group-chev" aria-hidden="true"></span>
+        </button>
+        <div class="setting-group-body" id="group-body-look">
+          <!-- 配色预设（js/palette.js 动态填充选项；颜色变量见 css/palette.css，
+               浅/深模式自动联动） -->
+          <label class="setting-label">
+            <span class="label-text">配色预设</span>
+            <select id="palette-select" class="setting-select" aria-label="配色预设"></select>
+          </label>
+          <div class="toggle-group" role="radiogroup" aria-label="主题模式">
+            <button class="theme-option" data-mode="auto" role="radio" aria-checked="true">🌗 自动</button>
+            <button class="theme-option" data-mode="light" role="radio" aria-checked="false">☀ 浅色</button>
+            <button class="theme-option" data-mode="dark" role="radio" aria-checked="false">🌙 深色</button>
+          </div>
+          <p class="setting-hint" id="auto-theme-hint">自动模式：6:00 – 18:00 浅色，其余时间深色</p>
+          <!-- 霓虹光效（内部实现为数字发光层）：三层模糊副本，光紧贴笔画
+               （见 js/core/glow.js、css/overlays.css）。
+               只在深色模式下生效：浅色背景上同样强度会发灰发脏，故浅色下不发光
+               （CSS 用 body[data-glow][data-theme="dark"] 限定，切回深色自动恢复）。 -->
+          <label class="toggle-row" id="glow-toggle-row">
+            <span class="toggle-text">霓虹光效</span>
+            <input type="checkbox" id="glow-toggle" class="toggle-switch">
+          </label>
+          <p class="setting-hint">仅在深色模式下生效，浅色模式不启用光效。</p>
+        </div>
+      </section>
+
+      <!-- 4. 时间格式 -->
+      <section class="setting-group" data-group="format" data-open="false">
+        <button class="setting-group-head" type="button" aria-expanded="false" aria-controls="group-body-format">
+          <span class="setting-group-title">时间格式</span>
+          <span class="setting-group-sum" data-sum="format"></span>
+          <span class="setting-group-chev" aria-hidden="true"></span>
+        </button>
+        <div class="setting-group-body" id="group-body-format">
+          <div class="toggle-group" role="radiogroup" aria-label="时间格式">
+            <button class="format-option" data-format="24" role="radio" aria-checked="true">24 小时制</button>
+            <button class="format-option" data-format="12" role="radio" aria-checked="false">12 小时制</button>
+          </div>
+          <label class="toggle-row">
+            <span class="toggle-text">显示秒数</span>
+            <input type="checkbox" id="show-seconds-toggle" class="toggle-switch" checked>
+          </label>
+          <label class="toggle-row">
+            <span class="toggle-text">显示 AM/PM</span>
+            <input type="checkbox" id="show-ampm-toggle" class="toggle-switch" checked>
+          </label>
+          <p class="setting-hint">「显示 AM/PM」仅 12 小时制下生效；关闭秒数或 AM/PM 后时/分显示不受影响。</p>
+        </div>
+      </section>
+
+      <!-- 5. 同步与天气（低频，默认折叠） -->
+      <section class="setting-group" data-group="data" data-open="false">
+        <button class="setting-group-head" type="button" aria-expanded="false" aria-controls="group-body-data">
+          <span class="setting-group-title">同步与天气</span>
+          <span class="setting-group-sum" data-sum="data"></span>
+          <span class="setting-group-chev" aria-hidden="true"></span>
+        </button>
+        <div class="setting-group-body" id="group-body-data">
+          <label class="toggle-row">
+            <span class="toggle-text">自动校准网络时间</span>
+            <input type="checkbox" id="auto-sync-toggle" class="toggle-switch" checked>
+          </label>
+          <p class="sync-status" id="sync-status">正在校准…</p>
+          <button id="resync-btn" class="action-btn">↻ 立即校准</button>
+          <p class="setting-hint">开启后自动从网络时间源校准（对齐 time.is 等网络时钟）；关闭则始终使用本地系统时间。</p>
+          <label class="setting-label">
+            <span class="label-text">天气数据源</span>
+            <select id="weather-source-select" class="setting-select" aria-label="天气数据源">
+              <option value="auto">自动（多源回退）</option>
+              <option value="amap">高德（中国区实况，需 API Key）</option>
+              <option value="ecmwf">ECMWF（Open-Meteo 模型）</option>
+              <option value="gfs">GFS（Open-Meteo 模型）</option>
+              <option value="cma">CMA 中国气象局（可能不稳定）</option>
+              <option value="wttr">wttr.in（无需 Key）</option>
+            </select>
+          </label>
+          <p class="setting-hint">自动模式按 高德 → ECMWF → GFS → wttr.in 顺序回退，直到成功；指定单一数据源时只使用该源。</p>
+          <p class="setting-hint" id="cma-warning" hidden>⚠ CMA 数据源（中国气象局 GRAPES 全球模型）可能因服务超负荷而不稳定，如遇异常请切换其他数据源。</p>
+          <label class="setting-label">
+            <span class="label-text">高德 API Key（可选）</span>
+            <input type="password" id="amap-key" class="setting-input" placeholder="粘贴高德 Web 服务 Key" autocomplete="off" spellcheck="false">
+          </label>
+          <p class="setting-hint" id="amap-key-hint">选择「高德」数据源时必须填写此 Key；Key 仅保存在本机浏览器。</p>
+          <p class="weather-status" id="weather-status">尚未获取天气数据</p>
+          <button id="refresh-weather" class="action-btn">↻ 刷新天气</button>
+        </div>
+      </section>
+
+      <!-- 6. 显示（低频，默认折叠） -->
+      <section class="setting-group" data-group="display" data-open="false">
+        <button class="setting-group-head" type="button" aria-expanded="false" aria-controls="group-body-display">
+          <span class="setting-group-title">显示</span>
+          <span class="setting-group-sum" data-sum="display"></span>
+          <span class="setting-group-chev" aria-hidden="true"></span>
+        </button>
+        <div class="setting-group-body" id="group-body-display">
+          <div class="zoom-control">
+            <span class="label-text">全局缩放 <span class="slider-value" id="zoom-value">100%</span></span>
+            <div class="zoom-buttons">
+              <button id="zoom-out-btn" class="zoom-btn" aria-label="缩小" title="缩小">−</button>
+              <button id="zoom-in-btn" class="zoom-btn" aria-label="放大" title="放大">＋</button>
+            </div>
+          </div>
+          <button id="fullscreen-btn" class="action-btn">⛶ 切换全屏</button>
+        </div>
       </section>
 
     </div>
@@ -242,25 +295,28 @@
 
   <!-- 模块化脚本：经典脚本 + 全局命名空间（window.ClockXxx），无需本地服务器/Node，
        双击 HTML（file:// 协议）即可运行。加载顺序即依赖顺序（defer 保证按文档序执行）：
-       utils → config → dom → state → timeSync → theme → clock → glow →
-       analogClock → fonts → fontToast → style → palette → weather → fullscreen →
-       settings → main -->
-  <script src="js/utils.js" defer></script>
-  <script src="js/config.js" defer></script>
-  <script src="js/dom.js" defer></script>
-  <script src="js/state.js" defer></script>
-  <script src="js/timeSync.js" defer></script>
-  <script src="js/theme.js" defer></script>
-  <script src="js/clock.js" defer></script>
-  <script src="js/glow.js" defer></script>
-  <script src="js/analogClock.js" defer></script>
-  <script src="js/fonts.js" defer></script>
-  <script src="js/fontToast.js" defer></script>
-  <script src="js/style.js" defer></script>
-  <script src="js/palette.js" defer></script>
-  <script src="js/weather.js" defer></script>
-  <script src="js/fullscreen.js" defer></script>
-  <script src="js/settings.js" defer></script>
+       core：utils → config → dom → state → timeSync → theme → clock → glow →
+       fonts → fontToast → palette → weather → fullscreen
+       styles：analog（风格套件）→ ui：style → select → slider → panel-groups → settings → main -->
+  <script src="js/core/utils.js" defer></script>
+  <script src="js/core/config.js" defer></script>
+  <script src="js/core/dom.js" defer></script>
+  <script src="js/core/state.js" defer></script>
+  <script src="js/core/timeSync.js" defer></script>
+  <script src="js/core/theme.js" defer></script>
+  <script src="js/core/clock.js" defer></script>
+  <script src="js/core/glow.js" defer></script>
+  <script src="js/styles/analog.js" defer></script>
+  <script src="js/core/fonts.js" defer></script>
+  <script src="js/core/fontToast.js" defer></script>
+  <script src="js/ui/style.js" defer></script>
+  <script src="js/core/palette.js" defer></script>
+  <script src="js/core/weather.js" defer></script>
+  <script src="js/core/fullscreen.js" defer></script>
+  <script src="js/ui/select.js" defer></script>
+  <script src="js/ui/slider.js" defer></script>
+  <script src="js/ui/panel-groups.js" defer></script>
+  <script src="js/ui/settings.js" defer></script>
   <script src="js/main.js" defer></script>
 </body>
 </html>

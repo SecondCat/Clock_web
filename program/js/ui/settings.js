@@ -12,7 +12,7 @@
 const { $ } = window.ClockUtils;
 const { state, saveState } = window.ClockState;
 const { applyTheme } = window.ClockTheme;
-const { applyStyle, applyFontSettings, applyFontVars, applyAnalogScale } = window.ClockStyle;
+const { applyStyle, applyFontSettings, applyFontVars } = window.ClockStyle;
 const { applyPalette } = window.ClockPalette;
 const { COLOR_PRESETS } = window.ClockConfig;
 const { syncTime, setSyncEnabled } = window.ClockTime;
@@ -27,12 +27,6 @@ const { clearFontCache } = window.ClockFonts;
 
 /* ---------- 全局缩放 ---------- */
 const ZOOM_MIN = 50, ZOOM_MAX = 200, ZOOM_STEP = 10;
-
-/* ---------- 触屏参数 ---------- */
-const MENU_FIT_SLACK = 24;      // 下拉菜单溢出不超过该值时不启用内部滚动（px）
-const SLIDER_THUMB_RADIUS = 10; // 与 CSS 中 thumb 直径 20px 对应
-const SLIDER_DRAG_SLOP = 6;     // 方向判定的最小位移（px，约 8dp 的 TouchSlop）
-const SLIDER_DIRECT_RATIO = 1.2; // 横向位移需超过纵向的 1.2 倍才判定为拖动
 
 /** 将 state.globalZoom（百分比）应用到 body 的 CSS zoom，实现页面级整体缩放。
     CSS zoom 会按比例缩放布局尺寸（含 fixed 定位的设置按钮/面板），
@@ -51,205 +45,6 @@ function applyZoom() {
   scheduleLayoutInfoBar();
 }
 
-/** 将所有 .setting-select 包装为自定义下拉组件：
-    - trigger（复刻 select 外观 + border chevron 箭头，替代原渐变箭头修复显示不完整）
-    - menu（展开列表，圆角 + 主题色，替代原生 option 列表以完整适配风格）
-    保留原 select（hidden）承载 value 与 change 语义；菜单项点击写回 value 并派发
-    change，复用 settings.js 原有的 change 监听。 */
-function setupCustomSelects() {
-  let openMenu = null; // 当前展开的菜单（互斥，同时只开一个）
-  const syncFns = [];   // 每个 select 的 sync 函数，供全局 syncAll 调用
-
-  /** 菜单高度自适应：溢出量很小（如配色预设 7 项只多出十几像素）时不启用内部
-      滚动，改为完整展开——避免为了十几像素建立独立的滚动容器，抢走触摸手势，
-      让「继续滑动带动面板」这件事完全由浏览器原生滚动链处理（更顺滑）。 */
-  function fitMenuHeight(menu) {
-    menu.classList.remove('menu-fits');
-    const overflow = menu.scrollHeight - menu.clientHeight;
-    if (overflow > 0 && overflow <= MENU_FIT_SLACK) menu.classList.add('menu-fits');
-  }
-
-  function closeCurrent() {
-    if (openMenu) {
-      openMenu.menu.hidden = true;
-      openMenu.trigger.classList.remove('open');
-      openMenu = null;
-    }
-  }
-
-  document.querySelectorAll('.setting-select').forEach((select) => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'custom-select';
-    select.parentNode.insertBefore(wrapper, select);
-
-    const trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.className = 'custom-select-trigger';
-    const label = document.createElement('span');
-    label.className = 'custom-select-label';
-    trigger.appendChild(label);
-    wrapper.appendChild(trigger);
-
-    const menu = document.createElement('ul');
-    menu.className = 'custom-select-menu';
-    menu.hidden = true;
-    wrapper.appendChild(menu);
-
-    // 原 select 移入 wrapper 并隐藏（保留 value / change 语义）
-    wrapper.appendChild(select);
-    select.hidden = true;
-
-    // 同步 trigger 文本 + 重建菜单项（含选中高亮）
-    function sync() {
-      const selected = select.options[select.selectedIndex];
-      label.textContent = selected ? selected.textContent : '';
-      menu.innerHTML = '';
-      Array.from(select.options).forEach((opt) => {
-        const li = document.createElement('li');
-        li.className = 'custom-select-option';
-        li.textContent = opt.textContent;
-        li.dataset.value = opt.value;
-        if (opt.selected) li.classList.add('selected');
-        li.addEventListener('click', (e) => {
-          // 阻止 click 冒泡到包裹层 <label>：label 的默认行为会把点击转发给
-          // 其内部第一个表单控件（trigger 按钮），导致 closeCurrent 后又触发
-          // trigger 的 open() 重新展开菜单（字体/天气源下拉被 label 包裹，
-          // 风格/配色下拉没有 —— 这正是只有前两者不能收回的根因）
-          e.preventDefault();
-          e.stopPropagation();
-          if (select.value !== opt.value) {
-            select.value = opt.value;
-            select.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-          sync();
-          closeCurrent();
-        });
-        menu.appendChild(li);
-      });
-    }
-    syncFns.push(sync);
-
-    function open() {
-      closeCurrent();
-      menu.hidden = false;
-      fitMenuHeight(menu); // 必须在可见后测量
-      trigger.classList.add('open');
-      openMenu = { menu, trigger };
-    }
-
-    trigger.addEventListener('click', () => {
-      if (menu.hidden) open();
-      else closeCurrent();
-    });
-
-    // 选项动态变化（如 font-family-select 被 applyFontSettings 重建）时同步菜单；
-    // 编程改 select.value（如 applyStyle 设 styleSelect.value）不触发 change/属性
-    // 变化，由 style.js 显式调用 window.ClockSelect.syncAll() 同步
-    new MutationObserver(sync).observe(select, { childList: true, subtree: true });
-
-    document.addEventListener('click', (e) => {
-      if (!wrapper.contains(e.target) && !menu.hidden) closeCurrent();
-    });
-
-    sync();
-  });
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeCurrent();
-  });
-
-  // 对外暴露：所有下拉同步（编程改 value 后调用）
-  window.ClockSelect = { syncAll: () => syncFns.forEach((fn) => fn()) };
-}
-
-/** 滑动条交互（按移动端平台通行做法设计）：
-    - 按下时不改值，先记住「按下点对应的值」，避免触摸下压就跳（那会先跳后回）
-    - 位移超过 slop 才判定方向：横向为主 → 接管手势，先把滑块跳到按下点，再实时跟随；
-      纵向为主 → 放弃，值不动，手势交还面板原生滚动（CSS touch-action: pan-y）
-    - 抬起：拖动过 → 保留当前值（不限制释放位置）；没拖动过（轻点）→ 定位到按下点
-    参考：iOS UISlider + UIScrollView 的手势抢占、Android SeekBar 的 TouchSlop、
-    Flutter Slider 的水平/垂直手势竞技场，做法一致：放开用户动作，用方向判定解冲突。 */
-function setupSliderDragControl() {
-  const inputs = document.querySelectorAll('.settings-body input[type="range"]');
-
-  inputs.forEach((input) => {
-    // 包一层定位容器：接管指针事件，同时给滑块留出足够的触摸高度
-    const wrap = document.createElement('span');
-    wrap.className = 'slider-drag-wrap';
-    input.parentNode.insertBefore(wrap, input);
-    wrap.appendChild(input);
-
-    let activeId = null;
-    let mode = '';        // ''（未判定）| 'drag'（横向拖动）| 'scroll'（纵向滚动）
-    let startX = 0;
-    let startY = 0;
-    let pressValue = '';  // 按下点对应的值（暂存，未判定前不写入）
-
-    const trackRect = () => wrap.getBoundingClientRect();
-
-    /** 触点横坐标 → 数值（含 thumb 半径与步长对齐） */
-    function valueAt(clientX) {
-      const rect = trackRect();
-      const min = parseFloat(input.min) || 0;
-      const max = parseFloat(input.max);
-      const step = parseFloat(input.step) || 1;
-      const usable = Math.max(1, rect.width - SLIDER_THUMB_RADIUS * 2);
-      const ratio = Math.min(1, Math.max(0, (clientX - rect.left - SLIDER_THUMB_RADIUS) / usable));
-      const raw = min + ratio * (max - min);
-      const snapped = min + Math.round((raw - min) / step) * step;
-      const clamped = Math.min(max, Math.max(min, snapped));
-      return String(Math.round(clamped * 1000) / 1000);
-    }
-
-    function applyValue(value) {
-      if (input.value === value) return;
-      input.value = value;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    wrap.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      activeId = e.pointerId;
-      mode = '';
-      startX = e.clientX;
-      startY = e.clientY;
-      pressValue = valueAt(e.clientX);
-      if (input.focus) input.focus({ preventScroll: true }); // 保留键盘可调
-      if (wrap.setPointerCapture) {
-        try { wrap.setPointerCapture(e.pointerId); } catch (err) { /* 旧浏览器忽略 */ }
-      }
-    });
-
-    wrap.addEventListener('pointermove', (e) => {
-      if (activeId !== e.pointerId) return;
-      const dx = e.clientX - startX;
-      const dy = e.clientY - startY;
-      if (!mode) {
-        const absX = Math.abs(dx);
-        const absY = Math.abs(dy);
-        if (absX < SLIDER_DRAG_SLOP && absY < SLIDER_DRAG_SLOP) return; // slop 内不判定
-        mode = absX > absY * SLIDER_DIRECT_RATIO ? 'drag' : 'scroll';
-        if (mode === 'drag') applyValue(pressValue); // 判定为拖动后才跳到按下点
-      }
-      if (mode === 'drag') applyValue(valueAt(e.clientX));
-    });
-
-    function finish(e, cancelled) {
-      if (activeId !== e.pointerId) return;
-      activeId = null;
-      const wasDrag = mode === 'drag';
-      const wasPending = mode === '';
-      mode = '';
-      if (wasDrag) return;      // 拖动过：保留最后数值，不限制释放位置
-      if (cancelled) return;    // 手势被系统接管（如原生滚动）：数值保持不动
-      if (wasPending) applyValue(pressValue); // 轻点：定位到按下点
-    }
-
-    wrap.addEventListener('pointerup', (e) => finish(e, false));
-    wrap.addEventListener('pointercancel', (e) => finish(e, true));
-  });
-}
-
 /** 绑定设置面板全部交互（由入口模块在 DOM 就绪后调用） */
 function setupSettingsPanel() {
   const panel = $('#settings-panel');
@@ -257,23 +52,47 @@ function setupSettingsPanel() {
   const openBtn = $('#settings-btn');
   const closeBtn = $('#close-settings');
 
+  // 焦点管理：打开时记住来源、把焦点移入面板；关闭时归还。
+  // 面板是模态抽屉，Tab 不应跑到被遮罩的页面上去（无焦点约束时会出现）。
+  let lastFocused = null;
+
+  function focusables() {
+    return [].filter.call(
+      panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+      (el) => !el.disabled && el.offsetParent !== null
+    );
+  }
+
   function openPanel() {
+    lastFocused = document.activeElement;
     panel.classList.add('open');
     overlay.hidden = false;
     requestAnimationFrame(() => overlay.classList.add('show'));
+    // 摘要可能已过期（例如上次改完值后关闭面板），打开时统一刷新一次
+    if (window.ClockPanelGroups) window.ClockPanelGroups.refresh();
+    if (closeBtn.focus) closeBtn.focus({ preventScroll: true });
   }
 
   function closePanel() {
     panel.classList.remove('open');
     overlay.classList.remove('show');
     setTimeout(() => { overlay.hidden = true; }, 300);
+    if (lastFocused && lastFocused.focus) lastFocused.focus({ preventScroll: true });
+    lastFocused = null;
   }
 
   openBtn.addEventListener('click', openPanel);
   closeBtn.addEventListener('click', closePanel);
   overlay.addEventListener('click', closePanel);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closePanel();
+    if (e.key === 'Escape') { closePanel(); return; }
+    if (e.key !== 'Tab' || !panel.classList.contains('open')) return;
+    const list = focusables();
+    if (!list.length) return;
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
 
   // 风格切换（下拉列表，与字体选择的交互方式一致）
@@ -428,20 +247,49 @@ function setupSettingsPanel() {
   }
 
   // 清空字体缓存：清除 IndexedDB 中缓存的字体文件，反馈清除结果
-  $('#clear-font-cache-btn').addEventListener('click', async () => {
-    const btn = $('#clear-font-cache-btn');
-    const hint = $('#font-cache-hint');
-    btn.disabled = true;
-    btn.textContent = '⏳ 清除中…';
+  // 清空字体缓存：破坏性操作，先展开行内确认（不弹系统对话框，避免打断沉浸式全屏）
+  const clearBtn = $('#clear-font-cache-btn');
+  const fontHint = $('#font-cache-hint');
+  const FONT_HINT_DEFAULT = fontHint ? fontHint.textContent : '';
+  let confirmBox = null;
+
+  function closeConfirm() {
+    if (!confirmBox) return;
+    confirmBox.remove();
+    confirmBox = null;
+    clearBtn.disabled = false;
+    clearBtn.textContent = '🗑 清空字体缓存';
+    clearBtn.focus({ preventScroll: true });
+  }
+
+  async function runClearFontCache() {
+    clearBtn.disabled = true;
+    clearBtn.textContent = '⏳ 清除中…';
     const cleared = await clearFontCache();
-    btn.disabled = false;
-    btn.textContent = '🗑 清空字体缓存';
-    hint.textContent = `✓ 已清除 ${cleared} 条字体缓存。下次切换字体时将重新从网络加载。`;
-    hint.style.color = 'var(--accent-color)';
-    setTimeout(() => {
-      hint.textContent = '缓存可加速字体加载，无需联网即可使用。如遇字体显示异常可清空后重新加载。';
-      hint.style.color = '';
-    }, 5000);
+    closeConfirm();
+    if (fontHint) {
+      fontHint.textContent = `✓ 已清除 ${cleared} 条字体缓存。下次切换字体时将重新从网络加载。`;
+      fontHint.style.color = 'var(--accent-color)';
+      setTimeout(() => {
+        fontHint.textContent = FONT_HINT_DEFAULT;
+        fontHint.style.color = '';
+      }, 5000);
+    }
+  }
+
+  clearBtn.addEventListener('click', () => {
+    if (confirmBox) { closeConfirm(); return; }
+    confirmBox = document.createElement('div');
+    confirmBox.className = 'inline-confirm';
+    confirmBox.innerHTML = '<p>清空后，未缓存的字体会在下次切换时重新联网下载。确定清空？</p>'
+      + '<div class="inline-confirm-actions">'
+      + '<button type="button" class="danger">确认清空</button>'
+      + '<button type="button" class="cancel">取消</button>'
+      + '</div>';
+    clearBtn.parentNode.insertBefore(confirmBox, clearBtn.nextSibling);
+    confirmBox.querySelector('.danger').addEventListener('click', runClearFontCache);
+    confirmBox.querySelector('.cancel').addEventListener('click', closeConfirm);
+    confirmBox.querySelector('.cancel').focus({ preventScroll: true });
   });
 
   // 时间自动校准开关：开启=网络校准，关闭=使用本地系统时间（偏移归零）
@@ -473,7 +321,7 @@ function setupSettingsPanel() {
     analogScaleSlider.value = String(state.analogScale);
     analogScaleSlider.addEventListener('input', (e) => {
       state.analogScale = Number(e.target.value);
-      applyAnalogScale();
+      if (window.ClockAnalog) window.ClockAnalog.applyScale();
       scheduleLayoutInfoBar();
       saveState();
     });
@@ -532,7 +380,7 @@ function setupSettingsPanel() {
     saveState();
   });
 
-  // 数字发光开关：三层模糊副本（见 glow.js 与报告第 12 节）
+  // 霓虹光效开关（内部状态名仍为 glow）：三层模糊副本（见 glow.js 与报告第 12 节）
   const glowToggle = $('#glow-toggle');
   if (glowToggle && window.ClockGlow) {
     glowToggle.checked = state.glow === 'on';
@@ -563,11 +411,15 @@ function setupSettingsPanel() {
     $('#fullscreen-btn').textContent = document.fullscreenElement ? '⤓ 退出全屏' : '⛶ 切换全屏';
   });
 
-  // 自定义下拉组件（在所有 select 选项初始化完成后包装，含动态填充的 palette/font select）
-  setupCustomSelects();
+  // 分组卡片：恢复折叠状态 + 绑定标题行 + 渲染摘要（必须先于下拉包装，
+  // 因为折叠态的卡片里 select 的布局尺寸为 0，包装逻辑要在可见状态确定后执行）
+  if (window.ClockPanelGroups) window.ClockPanelGroups.setup();
 
-  // 滑动条交互：三段式判定，避免触摸下压直接跳值
-  setupSliderDragControl();
+  // 自定义下拉组件（在所有 select 选项初始化完成后包装，含动态填充的 palette/font select）
+  window.ClockSelectPanel.setup();
+
+  // 滑动条交互：方向判定，避免触摸下压直接跳值
+  window.ClockSlider.setup();
 }
 
 /* ---------- 命名空间导出 ---------- */
